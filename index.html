@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🌹 Rosebud Cloud</title>
+<style>
+  :root{
+    --bg:#fdf7f8; --panel:#ffffff; --ink:#2b2326; --muted:#8a7a7e;
+    --rose:#c2185b; --rose-soft:#f7e3ea; --rose-line:#f0cdd9;
+    --line:#efe6e9; --chip:#fbeef3; --ok:#2e9e6b; --err:#c62828;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--ink);height:100vh;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#fff, #fdf3f6);flex-wrap:wrap}
+  header h1{font-size:17px;margin:0;font-weight:700}
+  header .sub{font-size:12px;color:var(--muted)}
+  header .spacer{flex:1}
+  header .who{font-size:12px;color:var(--muted)}
+  .btn{border:1px solid var(--rose-line);background:#fff;color:var(--rose);border-radius:10px;
+    padding:7px 12px;font-size:13px;cursor:pointer;transition:.15s}
+  .btn:hover{background:var(--rose-soft)}
+  .btn.primary{background:var(--rose);color:#fff;border-color:var(--rose)}
+  .btn.primary:hover{filter:brightness(1.05)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.small{padding:4px 9px;font-size:12px;border-radius:8px}
+  .modelwrap{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
+  .modelwrap select{border:1px solid var(--rose-line);border-radius:9px;padding:5px 8px;
+    font:inherit;font-size:12.5px;color:var(--ink);background:#fff;max-width:210px}
+
+  #mainWrap{flex:1;display:flex;flex-direction:column}
+  .modes{display:flex;gap:8px;padding:12px 20px 0}
+  .mode{border:1px solid var(--line);background:#fff;border-radius:12px;padding:9px 14px;cursor:pointer;
+    font-size:13px;color:var(--muted);transition:.15s}
+  .mode.active{border-color:var(--rose);color:var(--rose);background:var(--rose-soft);font-weight:600}
+
+  .chat{flex:1;overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;gap:14px}  .msg{max-width:78%;padding:11px 14px;border-radius:14px;line-height:1.6;font-size:14.5px;white-space:pre-wrap;word-break:break-word}
+  .msg.rosebud{align-self:flex-start;background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:4px}
+  .msg.viking{align-self:flex-end;background:var(--rose);color:#fff;border-bottom-right-radius:4px}
+  .msg .who{display:block;font-size:11px;opacity:.6;margin-bottom:3px}
+  .typing{font-style:italic;color:var(--muted)}
+
+  .chips{display:flex;gap:8px;flex-wrap:wrap;padding:8px 20px 0}
+  .chip{border:1px solid var(--rose-line);background:var(--chip);color:var(--rose);border-radius:999px;
+    padding:6px 12px;font-size:12.5px;cursor:pointer;transition:.15s}
+  .chip:hover{background:var(--rose-soft)}
+  .chip:disabled{opacity:.4;cursor:not-allowed}
+
+  .compose{display:flex;gap:10px;padding:12px 20px 16px;border-top:1px solid var(--line);background:#fff}
+  .compose textarea{flex:1;resize:none;height:46px;max-height:140px;border:1px solid var(--line);
+    border-radius:12px;padding:12px 14px;font:inherit;font-size:14px;outline:none}
+  .compose textarea:focus{border-color:var(--rose-line)}
+
+  .mask{position:fixed;inset:0;background:rgba(40,30,34,.35);display:none;align-items:center;
+    justify-content:center;padding:24px;z-index:50}
+  .mask.show{display:flex}
+  .modal{background:#fff;border-radius:16px;max-width:640px;width:100%;max-height:86vh;overflow:auto;
+    padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+  .modal h2{margin:0 0 14px;font-size:17px}
+  .modal label{display:block;font-size:12.5px;color:var(--muted);margin:12px 0 5px}
+  .modal input,.modal textarea{width:100%;border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;font:inherit;font-size:13.5px;outline:none}
+  .modal input:focus,.modal textarea:focus{border-color:var(--rose-line)}
+  .modal pre{background:#fbf6f8;border:1px solid var(--line);border-radius:10px;padding:14px;
+    font-size:12.5px;line-height:1.6;white-space:pre-wrap;max-height:46vh;overflow:auto;color:#3a2f33}
+  .modal .row{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap;align-items:center}
+  .hint{font-size:12px;color:var(--muted);line-height:1.7}
+  .saveok{color:var(--ok);font-size:13px;margin-top:10px}
+  .err{color:var(--err);font-size:13px;margin-top:8px;display:none}
+
+  /* 登录/注册 */
+  .authmask{position:fixed;inset:0;background:linear-gradient(160deg,#fdf3f6,#fbe7ef);
+    display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+  .authmask.show{display:flex}
+  .authcard{background:#fff;border-radius:20px;padding:28px 30px;width:100%;max-width:380px;
+    box-shadow:0 24px 70px rgba(0,0,0,.16)}
+  .authcard h1{font-size:20px;margin:0 0 4px}
+  .authcard .sub{font-size:12.5px;color:var(--muted);margin-bottom:18px}
+  .tabs{display:flex;gap:8px;margin-bottom:16px}
+  .tab{flex:1;text-align:center;padding:8px;border:1px solid var(--line);border-radius:10px;
+    font-size:13.5px;color:var(--muted);cursor:pointer;background:#fff}
+  .tab.active{border-color:var(--rose);color:var(--rose);background:var(--rose-soft);font-weight:600}
+  .authcard .btn.primary{width:100%;padding:11px;margin-top:16px;font-size:14px}
+
+  /* 存档列表 */
+  .daygroup{margin:14px 0}
+  .dayhead{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;
+    border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:8px}
+  .dayhead .spacer{flex:1}
+  .entrycard{border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:8px;background:#fff}
+  .entrycard .t{font-weight:600;font-size:13.5px}
+  .entrycard .r{font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.5}
+  .entrycard .meta{font-size:11px;color:var(--muted);margin-top:6px;display:flex;gap:10px;align-items:center}
+  .entrycard .meta .spacer{flex:1}
+  .rangedate{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+  .rangedate input{border:1px solid var(--line);border-radius:8px;padding:5px 8px;font:inherit;font-size:12.5px}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:30px 0}
+  .invitecode{display:inline-block;background:var(--rose-soft);color:var(--rose);border:1px dashed var(--rose-line);
+    border-radius:8px;padding:4px 10px;font-family:ui-monospace,monospace;font-size:13px;margin:3px 6px 3px 0}
+</style>
+</head>
+<body>
+
+<!-- ============ 登录 / 注册 ============ -->
+<div class="authmask show" id="authMask">
+  <div class="authcard">
+    <h1>🌹 Rosebud Cloud</h1>
+    <div class="sub">私人复盘教练 · 数据只属于你的账户</div>
+    <div class="tabs">
+      <div class="tab active" id="tabLogin">登录</div>
+      <div class="tab" id="tabRegister">注册</div>
+    </div>
+    <div id="loginForm">
+      <label>邮箱</label>
+      <input id="liEmail" type="email" placeholder="you@example.com" />
+      <label>密码</label>
+      <input id="liPass" type="password" placeholder="至少 6 位" />
+      <div class="err" id="liErr"></div>
+      <button class="btn primary" id="liBtn">登录</button>
+    </div>
+    <div id="regForm" style="display:none">
+      <label>邮箱</label>
+      <input id="rgEmail" type="email" placeholder="you@example.com" />
+      <label>密码</label>
+      <input id="rgPass" type="password" placeholder="至少 6 位" />
+      <label>邀请码</label>
+      <input id="rgInvite" placeholder="向管理员索取邀请码" />
+      <div class="err" id="rgErr"></div>
+      <button class="btn primary" id="rgBtn">注册并登录</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 主界面 ============ -->
+<header id="mainHeader" style="display:none">
+  <h1>🌹 Rosebud</h1><span class="sub">私人复盘 · 苏格拉底式教练</span>
+  <span class="modelwrap">模型
+    <select id="modelSel"><option>加载中…</option></select>
+  </span>
+  <span class="spacer"></span>
+  <span class="who" id="whoAmI"></span>
+  <button class="btn primary" id="genBtn">生成复盘并保存</button>
+  <button class="btn" id="archiveBtn">📚 我的存档</button>
+  <button class="btn" id="inviteBtn" style="display:none">🎟 邀请码</button>
+  <button class="btn" id="helpBtn">使用说明</button>
+  <button class="btn" id="settingsBtn">设置</button>
+  <button class="btn" id="logoutBtn">退出</button>
+</header>
+
+<div id="mainWrap" style="display:none">
+  <div class="modes" id="modes">
+    <div class="mode" data-mode="morning">🌅 晨间规划</div>
+    <div class="mode active" data-mode="evening">🌙 晚间复盘</div>
+    <div class="mode" data-mode="free">💭 自由对话</div>
+  </div>
+
+  <div class="chat" id="chat"></div>
+
+  <div class="chips" id="chips">
+    <div class="chip" data-act="提出一些建议">💡 提出一些建议</div>
+    <div class="chip" data-act="帮我思考一下这个问题">🧠 帮我思考一下</div>
+    <div class="chip" data-act="提供不同的观点">🔭 提供不同观点</div>
+    <div class="chip" data-act="进一步分析">🔬 进一步分析</div>
+    <div class="chip" data-act="建议下一步">👣 建议下一步</div>
+  </div>
+
+  <div class="compose">
+    <textarea id="input" placeholder="写点什么…（Ctrl/⌘+Enter 发送）"></textarea>
+    <button class="btn primary" id="sendBtn">发送</button>
+  </div>
+</div>
+
+<!-- 存档 modal -->
+<div class="mask" id="archiveMask">
+  <div class="modal" style="max-width:720px">
+    <h2>📚 我的存档（按天）</h2>
+    <div class="rangedate">
+      <span>导出区间：</span>
+      <input type="date" id="expFrom" /> ~ <input type="date" id="expTo" />
+      <button class="btn small" id="expRangeBtn">导出区间 zip</button>
+      <span class="spacer" style="flex:1"></span>
+      <button class="btn small" id="closeArchive">关闭</button>
+    </div>
+    <div id="entryList"><div class="empty">加载中…</div></div>
+  </div>
+</div>
+
+<!-- 邀请码 modal -->
+<div class="mask" id="inviteMask">
+  <div class="modal">
+    <h2>🎟 邀请码管理</h2>
+    <div class="row">
+      <button class="btn primary" id="genInviteBtn">生成 1 个邀请码</button>
+      <button class="btn" data-close="inviteMask">关闭</button>
+    </div>
+    <div id="inviteList"><div class="empty">加载中…</div></div>
+  </div>
+</div>
+
+<!-- 设置 modal -->
+<div class="mask" id="settingsMask">
+  <div class="modal">
+    <h2>⚙️ 设置</h2>
+    <label>API 地址（留空 = 本站；部署到独立后端时可填 https://your-api.example.com）</label>
+    <input id="setApiBase" placeholder="留空使用本站" />
+    <div class="row">
+      <button class="btn" data-close="settingsMask">关闭</button>
+      <button class="btn primary" id="saveSettings">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 说明 modal -->
+<div class="mask" id="helpMask">
+  <div class="modal">
+    <h2>🌹 这是什么</h2>
+    <p class="hint">
+      一个多用户版「复盘教练」。注册后用引导式提问把一天的事、担忧和觉察聊出来，
+      最后沉淀成带 <b>Reflection</b> 和 <b>Tags</b> 的结构化 markdown，<b>存进你自己的账户</b>，
+      随时按天导出为 md（Obsidian 可直接打开）。<br><br>
+      <b>怎么用：</b><br>
+      1. 登录（需要邀请码注册，找管理员索取）。<br>
+      2. 选模式：🌅 晨间规划 / 🌙 晚间复盘 / 💭 自由对话。<br>
+      3. 教练逐个引导提问，想换角度点下方快捷指令。<br>
+      4. 聊完点右上角「生成复盘并保存」→ 存入账户。<br>
+      5. 「📚 我的存档」里按天浏览、删除，或导出当日 md / 区间 zip。<br><br>
+      <b>关于 AI：</b>对话由服务端的大模型代理完成，key 只存在服务端环境变量，前端和代码仓库里都没有。
+    </p>
+    <div class="row"><button class="btn primary" data-close="helpMask">明白了</button></div>
+  </div>
+</div>
+
+<!-- 预览 modal -->
+<div class="mask" id="previewMask">
+  <div class="modal">
+    <h2>📝 复盘已生成并存入账户</h2>
+    <pre id="previewText"></pre>
+    <div class="saveok" id="saveStatus"></div>
+    <div class="row">
+      <button class="btn" id="copyBtn">复制全文</button>
+      <button class="btn" id="previewExport">导出当天 md</button>
+      <button class="btn primary" data-close="previewMask">完成</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = s=>document.querySelector(s);
+const chatEl = $("#chat");
+
+/* ---------- 状态 ---------- */
+let token = localStorage.getItem("rb_token") || "";
+let email = "";
+let isAdmin = false;
+let models = [];
+let activeModel = null;
+let apiBase = localStorage.getItem("rb_api") || "";
+let mode = "evening";
+let messages = [];
+let queue = [];
+let phase = "scripted";
+let busy = false;
+let lastDay = null;   // 最近一次保存的日期（供导出）
+let lastMd = "";
+
+const QUESTIONS = {
+  morning: ["今天你最重要的任务是什么？","今天有什么让你担心的事吗？","今天要怎样才能变得美好？"],
+  evening: ["今天最精彩的时刻是什么？","今天有什么让你感到压力的事情？","明天你期待什么？"],
+  free: []
+};
+const OPENERS = {
+  morning: "我们开始今天的晨间规划吧。",
+  evening: "辛苦了，我们来做个晚间复盘。",
+  free: "今天想聊点什么？或者有什么一直萦绕在心头、想借这个空间理一理的事？"
+};
+
+/* ---------- API ---------- */
+function apiUrl(p){ return apiBase.replace(/\/$/,"") + p; }
+async function api(path, opts={}){
+  const headers = Object.assign({"Content-Type":"application/json"}, opts.headers||{});
+  if(token) headers["Authorization"] = "Bearer " + token;
+  const r = await fetch(apiUrl(path), Object.assign({}, opts, {headers}));
+  if(r.status===401){ token=""; localStorage.removeItem("rb_token"); showAuth(); }
+  if(!r.ok){
+    let msg = "请求失败 " + r.status;
+    try{ const j = await r.json(); msg = j.error || msg; }catch(e){}
+    throw new Error(msg);
+  }
+  return r;
+}
+function td(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+
+/* ---------- 登录 / 注册 ---------- */
+function showAuth(){ $("#authMask").classList.add("show"); $("#mainHeader").style.display="none"; $("#mainWrap").style.display="none"; }
+function hideAuth(){
+  $("#authMask").classList.remove("show");
+  $("#mainHeader").style.display="flex"; $("#mainWrap").style.display="flex";
+  refreshMe();
+}
+async function doLogin(){
+  const em=$("#liEmail").value.trim(), pw=$("#liPass").value;
+  $("#liErr").style.display="none";
+  try{
+    const r = await fetch(apiUrl("/api/login"),{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({email:em,password:pw})});
+    const j = await r.json();
+    if(!r.ok){ $("#liErr").textContent=j.error||"登录失败"; $("#liErr").style.display="block"; return; }
+    token=j.token; email=j.email; isAdmin=!!j.is_admin;
+    localStorage.setItem("rb_token",token);
+    $("#liPass").value=""; hideAuth(); bootAfterAuth();
+  }catch(e){ $("#liErr").textContent="网络错误："+e.message; $("#liErr").style.display="block"; }
+}
+async function doRegister(){
+  const em=$("#rgEmail").value.trim(), pw=$("#rgPass").value, inv=$("#rgInvite").value.trim();
+  $("#rgErr").style.display="none";
+  try{
+    const r = await fetch(apiUrl("/api/register"),{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({email:em,password:pw,invite:inv})});
+    const j = await r.json();
+    if(!r.ok){ $("#rgErr").textContent=j.error||"注册失败"; $("#rgErr").style.display="block"; return; }
+    token=j.token; email=j.email; isAdmin=!!j.is_admin;
+    localStorage.setItem("rb_token",token);
+    $("#rgPass").value=""; $("#rgInvite").value=""; hideAuth(); bootAfterAuth();
+  }catch(e){ $("#rgErr").textContent="网络错误："+e.message; $("#rgErr").style.display="block"; }
+}
+async function refreshMe(){
+  if(!token) return;
+  try{
+    const r = await api("/api/me");
+    const j = await r.json();
+    email = j.email; isAdmin = !!j.is_admin;
+  }catch(e){}
+  $("#whoAmI").textContent = email;
+  $("#inviteBtn").style.display = isAdmin ? "" : "none";
+}
+function logout(){ token=""; localStorage.removeItem("rb_token"); showAuth(); }
+
+/* ---------- 教练对话 ---------- */
+function scrollBottom(){ chatEl.scrollTop = chatEl.scrollHeight; }
+function escapeHtml(s){ return s.replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function addMsg(role, text, typing=false){
+  const d=document.createElement("div");
+  d.className="msg "+role+(typing?" typing":"");
+  d.innerHTML=`<span class="who">${role==='rosebud'?'Rosebud':'你'}</span>`+escapeHtml(text);
+  chatEl.appendChild(d); scrollBottom(); return d;
+}
+async function apiCall(apiMessages){
+  const body = {messages: apiMessages};
+  if(activeModel) body.model = activeModel;
+  const r = await api("/api/chat",{method:"POST",body:JSON.stringify(body)});
+  const j = await r.json();
+  return j.content;
+}
+function persona(){
+  const modeName = {morning:"晨间规划",evening:"晚间复盘",free:"自由对话"}[mode];
+  return `你是一位名为 Rosebud 的私人复盘教练，陪伴用户进行每日反思与自我觉察。
+你的风格：
+- 苏格拉底式引导：多提问、少给结论；用温和的追问帮助用户自己看清想法，而不是直接下判断。
+- 温暖、真诚、不评判。认可他的努力与觉察，但不过度恭维。
+- 用中文，语气自然像一位有智慧的同行者。
+- 当用户说「提出一些建议 / 提供不同的观点 / 进一步分析 / 建议下一步 / 帮我思考一下这个问题」时，相应切换视角展开，但仍以引导和提问为主，结尾留一个开放性问题。
+- 除非被明确要求列清单，否则不要在每条回复里都罗列 1.2.3.；即便给建议，也要先共情、再引导。
+- 称呼对方为「你」，不要叫「用户」。
+- 这是私人工具，所有内容只属于用户本人，不要建议把内容发给任何人。
+当前模式：${modeName}。`;
+}
+function toApi(){ return messages.map(m=>({role:m.role==='rosebud'?'assistant':'user', content:m.text})); }
+
+function startMode(m){
+  mode=m; messages=[]; chatEl.innerHTML="";
+  queue=QUESTIONS[m].slice(); phase=queue.length?"scripted":"free";
+  document.querySelectorAll(".mode").forEach(el=>el.classList.toggle("active", el.dataset.mode===m));
+  addMsg("rosebud", OPENERS[m] + (queue.length?"\n\n"+queue.shift():""));
+  setChipsEnabled(true);
+}
+function setChipsEnabled(on){ document.querySelectorAll(".chip").forEach(c=>c.disabled=!on); }
+
+async function sendUser(text){
+  if(busy || !text.trim()) return;
+  busy=true; setChipsEnabled(false); $("#sendBtn").disabled=true;
+  addMsg("viking", text.trim());
+  messages.push({role:"viking", text:text.trim()});
+  const apiMessages = [{role:"system", content:persona()}, ...toApi()];
+  let directive=null;
+  if(phase==="scripted" && queue.length){
+    const nextQ=queue.shift();
+    directive=`（引导指令：先真诚、简要地回应用户上一条内容，然后提出下一个引导问题：「${nextQ}」。只问这一个问题，不要额外展开。）`;
+    if(queue.length===0) phase="free";
+  } else if(phase==="scripted" && queue.length===0){
+    phase="free";
+    directive="（引导问题已全部问完，现在转入自由复盘对话，继续用苏格拉底式提问陪伴用户深入探索。）";
+  }
+  if(directive) apiMessages.push({role:"system", content:directive});
+  const typingEl=addMsg("rosebud","思考中…",true);
+  try{
+    const reply=await apiCall(apiMessages);
+    typingEl.classList.remove("typing");
+    typingEl.innerHTML=`<span class="who">Rosebud</span>`+escapeHtml(reply);
+    messages.push({role:"rosebud", text:reply});
+  }catch(e){
+    typingEl.classList.remove("typing");
+    typingEl.innerHTML=`<span class="who">Rosebud</span>⚠️ ${escapeHtml(e.message)}`;
+  }
+  busy=false; setChipsEnabled(true); $("#sendBtn").disabled=false; scrollBottom();
+}
+function quickAction(act){
+  if(busy) return;
+  const apiMessages=[{role:"system", content:persona()}, ...toApi(),
+    {role:"user", content:act},
+    {role:"system", content:`（用户刚才的请求是「${act}」，请相应切换视角，以引导和提问为主，结尾留一个开放性问题。）`}];
+  busy=true; setChipsEnabled(false); $("#sendBtn").disabled=true;
+  addMsg("viking", act); messages.push({role:"viking", text:act});
+  const typingEl=addMsg("rosebud","思考中…",true);
+  apiCall(apiMessages).then(reply=>{
+    typingEl.classList.remove("typing");
+    typingEl.innerHTML=`<span class="who">Rosebud</span>`+escapeHtml(reply);
+    messages.push({role:"rosebud", text:reply});
+  }).catch(e=>{
+    typingEl.classList.remove("typing");
+    typingEl.innerHTML=`<span class="who">Rosebud</span>⚠️ ${escapeHtml(e.message)}`;
+  }).finally(()=>{ busy=false; setChipsEnabled(true); $("#sendBtn").disabled=false; scrollBottom(); });
+}
+
+/* ---------- 生成并保存 ---------- */
+function ordinal(n){ const s=["th","st","nd","rd"], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
+function formatDate(d){
+  const wd=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][d.getDay()];
+  const mo=["January","February","March","April","May","June","July","August","September","October","November","December"][d.getMonth()];
+  return `${wd}, ${mo} ${ordinal(d.getDate())}, ${d.getFullYear()}`;
+}
+function extractJson(text){
+  try{ return JSON.parse(text); }catch(e){}
+  const m=text.match(/\{[\s\S]*\}/);
+  if(m){ try{ return JSON.parse(m[0]); }catch(e){} }
+  return null;
+}
+async function generate(){
+  if(busy || messages.length===0){ alert("先聊一会儿，再生成复盘～"); return; }
+  busy=true; $("#genBtn").disabled=true;
+  const transcript=messages.map(m=>`**${m.role==='rosebud'?'Rosebud':'viking'}:** ${m.text}`).join("\n");
+  const sys=`你是复盘整理助手。请基于下面的对话，提炼结构化复盘元数据，仅输出一个 JSON 对象，不要任何多余文字。
+字段：
+- title: 简短中文标题（8-16字，概括这次复盘的核心主题）
+- emoji: 一个贴切的 emoji（如 🤝💡🌿😌⚡️🧭）
+- emotions: 英文情绪标签数组，从 {Worried, Thoughtful, Satisfied, Relaxed, Stressed, Hopeful, Content, Relieved, Angry, Disappointed, Calm, Excited} 中选
+- people: 涉及的人名或角色数组（如 ["赵女士","HR"]），没有则为 []
+- topics: 英文主题标签数组（如 ["Self-Understanding","Communication Skills","Employee Engagement"]）
+- reflection: 一段 80-160 字的中文洞察，聚焦用户自己的成长、觉察与下一步，不要复述对话内容。
+示例输出：{"title":"...","emoji":"🤝","emotions":["Worried","Thoughtful"],"people":["赵女士"],"topics":["Self-Understanding"],"reflection":"..."}`;
+  let meta=null;
+  try{
+    const content=await apiCall([{role:"system",content:sys},{role:"user",content:"对话内容：\n"+transcript+"\n\n请生成 JSON："}]);
+    meta=extractJson(content);
+  }catch(e){ alert("生成失败："+e.message); busy=false; $("#genBtn").disabled=false; return; }
+  if(!meta){ alert("AI 未返回可解析的 JSON，请重试。"); busy=false; $("#genBtn").disabled=false; return; }
+  const day=td();
+  lastDay=day;
+  const md = `## ${meta.emoji||"🌹"} ${meta.title||"复盘"}\n### ${formatDate(new Date())}\n\n#### Tags\n**Emotions:** ${(meta.emotions||[]).join(", ")}\n**People:** ${(meta.people&&meta.people.length)?meta.people.join(", "):"—"}\n**Topics:** ${(meta.topics||[]).join(", ")}\n\n#### Reflection\n${meta.reflection||""}\n\n#### Entry\n${transcript}\n`;
+  lastMd = md;
+  $("#previewText").textContent = md;
+  $("#saveStatus").textContent = "";
+  $("#previewMask").classList.add("show");
+  try{
+    const r = await api("/api/save",{method:"POST",body:JSON.stringify({
+      day, title: meta.title||"复盘", emoji: meta.emoji||"🌹",
+      emotions: meta.emotions||[], people: meta.people||[], topics: meta.topics||[],
+      reflection: meta.reflection||"", transcript
+    })});
+    const j = await r.json();
+    $("#saveStatus").textContent = j.ok ? ("✅ 已存入账户：" + j.day) : ("⚠️ 保存失败："+(j.error||""));
+  }catch(e){ $("#saveStatus").textContent = "⚠️ 保存出错：" + e.message; }
+  busy=false; $("#genBtn").disabled=false;
+}
+
+/* ---------- 存档 ---------- */
+async function loadEntries(){
+  const box=$("#entryList"); box.innerHTML='<div class="empty">加载中…</div>';
+  try{
+    const r=await api("/api/entries");
+    const j=await r.json();
+    const es=j.entries||[];
+    if(!es.length){ box.innerHTML='<div class="empty">还没有存档。先去聊一段，然后「生成复盘并保存」。</div>'; return; }
+    const groups={};
+    es.forEach(e=>{ (groups[e.day]=groups[e.day]||[]).push(e); });
+    box.innerHTML="";
+    Object.keys(groups).sort().reverse().forEach(day=>{
+      const g=document.createElement("div"); g.className="daygroup";
+      const head=document.createElement("div"); head.className="dayhead";
+      head.innerHTML=`📅 ${day} <span class="spacer"></span>
+        <button class="btn small" data-expday="${day}">导出当日 md</button>`;
+      g.appendChild(head);
+      groups[day].forEach(e=>{
+        const card=document.createElement("div"); card.className="entrycard";
+        card.innerHTML=`<div class="t">${e.emoji||""} ${escapeHtml(e.title||"复盘")}</div>
+          <div class="r">${escapeHtml((e.reflection||"").slice(0,120))}</div>
+          <div class="meta"><span>${escapeHtml(e.created_at||"")}</span><span class="spacer"></span>
+            <button class="btn small" data-del="${e.id}">删除</button></div>`;
+        g.appendChild(card);
+      });
+      box.appendChild(g);
+    });
+    box.querySelectorAll("[data-expday]").forEach(b=>b.onclick=()=>exportDay(b.dataset.expday));
+    box.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>delEntry(b.dataset.del));
+  }catch(e){ box.innerHTML='<div class="empty">加载失败：'+escapeHtml(e.message)+'</div>'; }
+}
+async function exportDay(day){
+  const r=await api("/api/export?day="+day);
+  const blob=await r.blob();
+  downloadBlob(blob, day+".md");
+}
+async function exportRange(){
+  const f=$("#expFrom").value, t=$("#expTo").value;
+  if(!f||!t){ alert("请选择起始和结束日期"); return; }
+  const r=await api(`/api/export?from=${f}&to=${t}`);
+  const blob=await r.blob();
+  downloadBlob(blob, `rosebud_${f}_to_${t}.zip`);
+}
+async function delEntry(id){
+  if(!confirm("删除这条复盘？不可恢复。")) return;
+  await api("/api/entries/"+id,{method:"DELETE"});
+  loadEntries();
+}
+function downloadBlob(blob, name){
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+}
+
+/* ---------- 邀请码 ---------- */
+async function loadInvites(){
+  const box=$("#inviteList"); box.innerHTML='<div class="empty">加载中…</div>';
+  try{
+    const r=await api("/api/invites");
+    const j=await r.json();
+    const iv=j.invites||[];
+    if(!iv.length){ box.innerHTML='<div class="empty">还没有生成过邀请码。</div>'; return; }
+    box.innerHTML="";
+    iv.forEach(i=>{
+      const row=document.createElement("div");
+      row.style.cssText="padding:7px 0;border-bottom:1px solid var(--line);font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap";
+      row.innerHTML=`<span class="invitecode">${escapeHtml(i.code)}</span>
+        <span style="color:var(--muted)">${i.used_by?"已使用："+escapeHtml(i.used_by):"未使用"}</span>
+        <span style="color:var(--muted);font-size:12px">${escapeHtml(i.created_at||"")}</span>`;
+      box.appendChild(row);
+    });
+  }catch(e){ box.innerHTML='<div class="empty">加载失败：'+escapeHtml(e.message)+'</div>'; }
+}
+async function genInvite(){
+  const r=await api("/api/invite",{method:"POST",body:JSON.stringify({count:1})});
+  const j=await r.json();
+  if(j.ok && j.codes && j.codes.length){
+    alert("新邀请码："+j.codes[0]+"\n\n发给想用的人，凭它注册。");
+  } else { alert("生成失败："+(j.error||"")); }
+  loadInvites();
+}
+
+/* ---------- 模型 / 设置 ---------- */
+function setupModelSel(){
+  const sel=$("#modelSel"); sel.innerHTML="";
+  models.forEach(m=>{
+    const o=document.createElement("option");
+    o.value=m.model; o.textContent=(m.name||m.model)+(m.primary?"（主）":"");
+    sel.appendChild(o);
+  });
+  if(activeModel) sel.value=activeModel;
+  sel.onchange=()=>{ activeModel=sel.value||null; };
+}
+function loadSettings(){
+  $("#setApiBase").value=apiBase;
+}
+function saveSettings(){
+  apiBase=$("#setApiBase").value.trim().replace(/\/$/,"");
+  localStorage.setItem("rb_api",apiBase);
+  $("#settingsMask").classList.remove("show");
+  alert("已保存 API 地址："+(apiBase||"本站"));
+}
+
+/* ---------- 启动 ---------- */
+async function bootAfterAuth(){
+  try{
+    const r=await api("/api/config");
+    const c=await r.json();
+    models=c.models||[]; activeModel=c.active||null;
+    setupModelSel();
+  }catch(e){}
+  refreshMe();
+  startMode("evening");
+}
+function bindEvents(){
+  $("#tabLogin").onclick=()=>{ $("#tabLogin").classList.add("active"); $("#tabRegister").classList.remove("active");
+    $("#loginForm").style.display="block"; $("#regForm").style.display="none"; };
+  $("#tabRegister").onclick=()=>{ $("#tabRegister").classList.add("active"); $("#tabLogin").classList.remove("active");
+    $("#loginForm").style.display="none"; $("#regForm").style.display="block"; };
+  $("#liBtn").onclick=doLogin;
+  $("#liPass").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
+  $("#rgBtn").onclick=doRegister;
+  $("#rgInvite").addEventListener("keydown",e=>{ if(e.key==="Enter") doRegister(); });
+  $("#logoutBtn").onclick=logout;
+  document.querySelectorAll(".mode").forEach(el=>el.onclick=()=>startMode(el.dataset.mode));
+  $("#sendBtn").onclick=()=>{ const v=$("#input").value; if(v.trim()){ $("#input").value=""; sendUser(v);} };
+  $("#input").addEventListener("keydown",e=>{ if((e.metaKey||e.ctrlKey)&&e.key==="Enter"){ const v=$("#input").value; if(v.trim()){ $("#input").value=""; sendUser(v);} }});
+  document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>quickAction(c.dataset.act));
+  $("#genBtn").onclick=generate;
+  $("#archiveBtn").onclick=()=>{ $("#archiveMask").classList.add("show"); loadEntries(); };
+  $("#closeArchive").onclick=()=>$("#archiveMask").classList.remove("show");
+  $("#expRangeBtn").onclick=exportRange;
+  $("#inviteBtn").onclick=()=>{ $("#inviteMask").classList.add("show"); loadInvites(); };
+  $("#genInviteBtn").onclick=genInvite;
+  $("#settingsBtn").onclick=()=>{ loadSettings(); $("#settingsMask").classList.add("show"); };
+  $("#saveSettings").onclick=saveSettings;
+  $("#helpBtn").onclick=()=>$("#helpMask").classList.add("show");
+  $("#copyBtn").onclick=()=>{ navigator.clipboard.writeText($("#previewText").textContent); $("#copyBtn").textContent="已复制✓"; setTimeout(()=>$("#copyBtn").textContent="复制全文",1500); };
+  $("#previewExport").onclick=async()=>{ if(lastDay){ try{ await exportDay(lastDay); }catch(e){ alert(e.message); } } };
+  document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$("#"+b.dataset.close).classList.remove("show"));
+  document.querySelectorAll(".mask").forEach(m=>m.onclick=e=>{ if(e.target===m) m.classList.remove("show"); });
+}
+async function boot(){
+  bindEvents();
+  if(token){ hideAuth(); bootAfterAuth(); }
+  else { showAuth(); }
+}
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+# Rosebud Cloud —— 纯 Python 标准库实现，无需任何第三方依赖。
+# Render 的 Python 运行时需要本文件存在；留空即可。
