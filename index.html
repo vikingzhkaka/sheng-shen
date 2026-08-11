@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>省身 · 每日三省</title>
 <link rel="icon" type="image/svg+xml" href="logo-mark.svg" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="supabase-config.js"></script>
 <style>
   :root{
     --bg:#f4f9f8; --panel:#ffffff; --ink:#22312f; --muted:#7c918d;
@@ -38,7 +41,8 @@
     font-size:13px;color:var(--muted);transition:.15s}
   .mode.active{border-color:var(--rose);color:var(--rose);background:var(--rose-soft);font-weight:600}
 
-  .chat{flex:1;overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;gap:14px}  .msg{max-width:78%;padding:11px 14px;border-radius:14px;line-height:1.6;font-size:14.5px;white-space:pre-wrap;word-break:break-word}
+  .chat{flex:1;overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;gap:14px}
+  .msg{max-width:78%;padding:11px 14px;border-radius:14px;line-height:1.6;font-size:14.5px;white-space:pre-wrap;word-break:break-word}
   .msg.rosebud{align-self:flex-start;background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:4px}
   .msg.viking{align-self:flex-end;background:var(--rose);color:#fff;border-bottom-right-radius:4px}
   .msg .who{display:block;font-size:11px;opacity:.6;margin-bottom:3px}
@@ -72,8 +76,7 @@
   .saveok{color:var(--ok);font-size:13px;margin-top:10px}
   .err{color:var(--err);font-size:13px;margin-top:8px;display:none}
 
-  /* 登录/注册 */
-  .authmask{position:fixed;inset:0;background:linear-gradient(160deg,#fdf3f6,#fbe7ef);
+  .authmask{position:fixed;inset:0;background:linear-gradient(160deg,#eef6f4,#e2efec);
     display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
   .authmask.show{display:flex}
   .authcard{background:#fff;border-radius:20px;padding:28px 30px;width:100%;max-width:380px;
@@ -86,7 +89,6 @@
   .tab.active{border-color:var(--rose);color:var(--rose);background:var(--rose-soft);font-weight:600}
   .authcard .btn.primary{width:100%;padding:11px;margin-top:16px;font-size:14px}
 
-  /* 存档列表 */
   .daygroup{margin:14px 0}
   .dayhead{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;
     border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:8px}
@@ -109,7 +111,7 @@
 <div class="authmask show" id="authMask">
   <div class="authcard">
     <h1>省身</h1>
-    <div class="sub">每日三省 · 照见自己 · 数据只属于你的账户</div>
+    <div class="sub" id="authSub">每日三省 · 照见自己 · 数据只属于你的账户</div>
     <div class="tabs">
       <div class="tab active" id="tabLogin">登录</div>
       <div class="tab" id="tabRegister">注册</div>
@@ -147,7 +149,6 @@
   <button class="btn" id="archiveBtn">📚 我的存档</button>
   <button class="btn" id="inviteBtn" style="display:none">🎟 邀请码</button>
   <button class="btn" id="helpBtn">使用说明</button>
-  <button class="btn" id="settingsBtn">设置</button>
   <button class="btn" id="logoutBtn">退出</button>
 </header>
 
@@ -201,25 +202,12 @@
   </div>
 </div>
 
-<!-- 设置 modal -->
-<div class="mask" id="settingsMask">
-  <div class="modal">
-    <h2>⚙️ 设置</h2>
-    <label>API 地址（留空 = 本站；部署到独立后端时可填 https://your-api.example.com）</label>
-    <input id="setApiBase" placeholder="留空使用本站" />
-    <div class="row">
-      <button class="btn" data-close="settingsMask">关闭</button>
-      <button class="btn primary" id="saveSettings">保存</button>
-    </div>
-  </div>
-</div>
-
 <!-- 说明 modal -->
 <div class="mask" id="helpMask">
   <div class="modal">
     <h2>☯ 这是什么</h2>
     <p class="hint">
-      一个多用户版「复盘教练」。注册后用引导式提问把一天的事、担忧和觉察聊出来，
+      一个多用户版「复盘教练」（典出《论语》"吾日三省吾身"）。注册后用引导式提问把一天的事、担忧和觉察聊出来，
       最后沉淀成带 <b>Reflection</b> 和 <b>Tags</b> 的结构化 markdown，<b>存进你自己的账户</b>，
       随时按天导出为 md（Obsidian 可直接打开）。<br><br>
       <b>怎么用：</b><br>
@@ -228,7 +216,8 @@
       3. 教练逐个引导提问，想换角度点下方快捷指令。<br>
       4. 聊完点右上角「生成复盘并保存」→ 存入账户。<br>
       5. 「📚 我的存档」里按天浏览、删除，或导出当日 md / 区间 zip。<br><br>
-      <b>关于 AI：</b>对话由服务端的大模型代理完成，key 只存在服务端环境变量，前端和代码仓库里都没有。
+      <b>关于 AI：</b>对话由 Supabase Edge Function 代理，AI key 只存在 Supabase 的环境变量里，
+      前端和代码仓库里都没有。
     </p>
     <div class="row"><button class="btn primary" data-close="helpMask">明白了</button></div>
   </div>
@@ -252,21 +241,25 @@
 "use strict";
 const $ = s=>document.querySelector(s);
 const chatEl = $("#chat");
+const CFG = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) ? window.SUPABASE_CONFIG : null;
+const MODELS = [
+  {model:"deepseek-v4-flash", name:"DeepSeek V4 Flash（主）", primary:true},
+  {model:"sensenova-6.7-flash-lite", name:"SenseNova 6.7-Flash-Lite（辅）"}
+];
 
 /* ---------- 状态 ---------- */
-let token = localStorage.getItem("rb_token") || "";
-let email = "";
-let isAdmin = false;
-let models = [];
+let sb = null;
 let activeModel = null;
-let apiBase = localStorage.getItem("rb_api") || "";
 let mode = "evening";
 let messages = [];
 let queue = [];
 let phase = "scripted";
 let busy = false;
-let lastDay = null;   // 最近一次保存的日期（供导出）
-let lastMd = "";
+let email = "";
+let isAdmin = false;
+let accessToken = "";
+let uid = "";
+let lastDay = null;
 
 const QUESTIONS = {
   morning: ["今天你最重要的任务是什么？","今天有什么让你担心的事吗？","今天要怎样才能变得美好？"],
@@ -279,81 +272,89 @@ const OPENERS = {
   free: "今天想聊点什么？或者有什么一直萦绕在心头、想借这个空间理一理的事？"
 };
 
-/* ---------- API ---------- */
-function apiUrl(p){ return apiBase.replace(/\/$/,"") + p; }
-async function api(path, opts={}){
-  const headers = Object.assign({"Content-Type":"application/json"}, opts.headers||{});
-  if(token) headers["Authorization"] = "Bearer " + token;
-  const r = await fetch(apiUrl(path), Object.assign({}, opts, {headers}));
-  if(r.status===401){ token=""; localStorage.removeItem("rb_token"); showAuth(); }
-  if(!r.ok){
-    let msg = "请求失败 " + r.status;
-    try{ const j = await r.json(); msg = j.error || msg; }catch(e){}
-    throw new Error(msg);
-  }
-  return r;
-}
+/* ---------- 工具 ---------- */
+function esc(s){ return s.replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 function td(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function scrollBottom(){ chatEl.scrollTop = chatEl.scrollHeight; }
+function addMsg(role, text, typing=false){
+  const d=document.createElement("div");
+  d.className="msg "+role+(typing?" typing":"");
+  d.innerHTML=`<span class="who">${role==='rosebud'?'省身':'你'}</span>`+esc(text);
+  chatEl.appendChild(d); scrollBottom(); return d;
+}
+function downloadBlob(blob, name){
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+}
 
-/* ---------- 登录 / 注册 ---------- */
-function showAuth(){ $("#authMask").classList.add("show"); $("#mainHeader").style.display="none"; $("#mainWrap").style.display="none"; }
+/* ---------- 会话 ---------- */
+function useSession(sess){
+  accessToken = sess.access_token || "";
+  uid = (sess.user && sess.user.id) || "";
+  email = (sess.user && sess.user.email) || "";
+}
+function showAuth(){
+  $("#authMask").classList.add("show");
+  $("#mainHeader").style.display="none"; $("#mainWrap").style.display="none";
+}
 function hideAuth(){
   $("#authMask").classList.remove("show");
   $("#mainHeader").style.display="flex"; $("#mainWrap").style.display="flex";
   refreshMe();
 }
 async function doLogin(){
+  if(!CFG){ return; }
   const em=$("#liEmail").value.trim(), pw=$("#liPass").value;
   $("#liErr").style.display="none";
   try{
-    const r = await fetch(apiUrl("/api/login"),{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({email:em,password:pw})});
-    const j = await r.json();
-    if(!r.ok){ $("#liErr").textContent=j.error||"登录失败"; $("#liErr").style.display="block"; return; }
-    token=j.token; email=j.email; isAdmin=!!j.is_admin;
-    localStorage.setItem("rb_token",token);
-    $("#liPass").value=""; hideAuth(); bootAfterAuth();
-  }catch(e){ $("#liErr").textContent="网络错误："+e.message; $("#liErr").style.display="block"; }
+    const { data, error } = await sb.auth.signInWithPassword({email:em, password:pw});
+    if(error) throw new Error(error.message);
+    useSession(data.session); $("#liPass").value="";
+    hideAuth(); bootAfterAuth();
+  }catch(e){ $("#liErr").textContent=e.message; $("#liErr").style.display="block"; }
 }
 async function doRegister(){
+  if(!CFG){ return; }
   const em=$("#rgEmail").value.trim(), pw=$("#rgPass").value, inv=$("#rgInvite").value.trim();
   $("#rgErr").style.display="none";
   try{
-    const r = await fetch(apiUrl("/api/register"),{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({email:em,password:pw,invite:inv})});
+    const r = await fetch(CFG.url.replace(/\/$/,"")+"/functions/v1/register",
+      {method:"POST", headers:{"Content-Type":"application/json"},
+       body: JSON.stringify({email:em, password:pw, code:inv})});
     const j = await r.json();
-    if(!r.ok){ $("#rgErr").textContent=j.error||"注册失败"; $("#rgErr").style.display="block"; return; }
-    token=j.token; email=j.email; isAdmin=!!j.is_admin;
-    localStorage.setItem("rb_token",token);
-    $("#rgPass").value=""; $("#rgInvite").value=""; hideAuth(); bootAfterAuth();
-  }catch(e){ $("#rgErr").textContent="网络错误："+e.message; $("#rgErr").style.display="block"; }
+    if(!r.ok) throw new Error(j.error || ("注册失败 " + r.status));
+    const { data, error } = await sb.auth.signInWithPassword({email:em, password:pw});
+    if(error) throw new Error(error.message);
+    useSession(data.session); $("#rgPass").value=""; $("#rgInvite").value="";
+    hideAuth(); bootAfterAuth();
+  }catch(e){ $("#rgErr").textContent=e.message; $("#rgErr").style.display="block"; }
 }
 async function refreshMe(){
-  if(!token) return;
+  if(!uid || !sb) return;
   try{
-    const r = await api("/api/me");
-    const j = await r.json();
-    email = j.email; isAdmin = !!j.is_admin;
+    const { data } = await sb.from("profiles").select("email,is_admin").eq("id", uid).maybeSingle();
+    if(data){ email = data.email; isAdmin = !!data.is_admin; }
   }catch(e){}
   $("#whoAmI").textContent = email;
   $("#inviteBtn").style.display = isAdmin ? "" : "none";
 }
-function logout(){ token=""; localStorage.removeItem("rb_token"); showAuth(); }
+async function logout(){
+  if(sb) await sb.auth.signOut();
+  email=""; uid=""; accessToken=""; isAdmin=false;
+  showAuth();
+}
 
 /* ---------- 教练对话 ---------- */
-function scrollBottom(){ chatEl.scrollTop = chatEl.scrollHeight; }
-function escapeHtml(s){ return s.replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
-function addMsg(role, text, typing=false){
-  const d=document.createElement("div");
-  d.className="msg "+role+(typing?" typing":"");
-  d.innerHTML=`<span class="who">${role==='rosebud'?'省身':'你'}</span>`+escapeHtml(text);
-  chatEl.appendChild(d); scrollBottom(); return d;
-}
 async function apiCall(apiMessages){
   const body = {messages: apiMessages};
   if(activeModel) body.model = activeModel;
-  const r = await api("/api/chat",{method:"POST",body:JSON.stringify(body)});
+  const r = await fetch(CFG.url.replace(/\/$/,"")+"/functions/v1/chat",
+    {method:"POST",
+     headers:{"Content-Type":"application/json","Authorization":"Bearer "+accessToken},
+     body: JSON.stringify(body)});
   const j = await r.json();
+  if(!r.ok) throw new Error(j.error || ("对话失败 " + r.status));
   return j.content;
 }
 function persona(){
@@ -400,11 +401,11 @@ async function sendUser(text){
   try{
     const reply=await apiCall(apiMessages);
     typingEl.classList.remove("typing");
-    typingEl.innerHTML=`<span class="who">省身</span>`+escapeHtml(reply);
+    typingEl.innerHTML=`<span class="who">省身</span>`+esc(reply);
     messages.push({role:"rosebud", text:reply});
   }catch(e){
     typingEl.classList.remove("typing");
-    typingEl.innerHTML=`<span class="who">省身</span>⚠️ ${escapeHtml(e.message)}`;
+    typingEl.innerHTML=`<span class="who">省身</span>⚠️ ${esc(e.message)}`;
   }
   busy=false; setChipsEnabled(true); $("#sendBtn").disabled=false; scrollBottom();
 }
@@ -418,11 +419,11 @@ function quickAction(act){
   const typingEl=addMsg("rosebud","思考中…",true);
   apiCall(apiMessages).then(reply=>{
     typingEl.classList.remove("typing");
-    typingEl.innerHTML=`<span class="who">省身</span>`+escapeHtml(reply);
+    typingEl.innerHTML=`<span class="who">省身</span>`+esc(reply);
     messages.push({role:"rosebud", text:reply});
   }).catch(e=>{
     typingEl.classList.remove("typing");
-    typingEl.innerHTML=`<span class="who">省身</span>⚠️ ${escapeHtml(e.message)}`;
+    typingEl.innerHTML=`<span class="who">省身</span>⚠️ ${esc(e.message)}`;
   }).finally(()=>{ busy=false; setChipsEnabled(true); $("#sendBtn").disabled=false; scrollBottom(); });
 }
 
@@ -461,29 +462,45 @@ async function generate(){
   const day=td();
   lastDay=day;
   const md = `## ${meta.emoji||"🌿"} ${meta.title||"复盘"}\n### ${formatDate(new Date())}\n\n#### Tags\n**Emotions:** ${(meta.emotions||[]).join(", ")}\n**People:** ${(meta.people&&meta.people.length)?meta.people.join(", "):"—"}\n**Topics:** ${(meta.topics||[]).join(", ")}\n\n#### Reflection\n${meta.reflection||""}\n\n#### Entry\n${transcript}\n`;
-  lastMd = md;
   $("#previewText").textContent = md;
-  $("#saveStatus").textContent = "";
+  $("#saveStatus").textContent = "保存中…";
   $("#previewMask").classList.add("show");
   try{
-    const r = await api("/api/save",{method:"POST",body:JSON.stringify({
-      day, title: meta.title||"复盘", emoji: meta.emoji||"🌿",
+    const { error } = await sb.from("entries").insert({
+      user_id: uid, day,
+      title: meta.title||"复盘", emoji: meta.emoji||"🌿",
       emotions: meta.emotions||[], people: meta.people||[], topics: meta.topics||[],
       reflection: meta.reflection||"", transcript
-    })});
-    const j = await r.json();
-    $("#saveStatus").textContent = j.ok ? ("✅ 已存入账户：" + j.day) : ("⚠️ 保存失败："+(j.error||""));
+    });
+    $("#saveStatus").textContent = error ? ("⚠️ 保存失败："+error.message) : ("✅ 已存入账户：" + day);
   }catch(e){ $("#saveStatus").textContent = "⚠️ 保存出错：" + e.message; }
   busy=false; $("#genBtn").disabled=false;
 }
 
 /* ---------- 存档 ---------- */
+function entryToMd(e){
+  const lines = [`## ${e.emoji||"🌿"} ${e.title||"复盘"}`,
+    `### ${(e.created_at||"").replace("T"," ").slice(0,16)}`, "",
+    "#### Tags",
+    `**Emotions:** ${(e.emotions||[]).join(", ")}`,
+    `**People:** ${(e.people&&e.people.length)?e.people.join(", "):"—"}`,
+    `**Topics:** ${(e.topics||[]).join(", ")}`, "",
+    "#### Reflection", e.reflection||""];
+  if(e.transcript) lines.push("", "#### Entry", e.transcript);
+  return lines.join("\n");
+}
+function dayMd(day, entries){
+  return `---\ndate: ${day}\ntype: sheng-shen-daily\ntags: [复盘日记]\n---\n\n# 省身 · ${day}\n\n`
+    + entries.map(entryToMd).join("\n\n---\n\n");
+}
 async function loadEntries(){
   const box=$("#entryList"); box.innerHTML='<div class="empty">加载中…</div>';
   try{
-    const r=await api("/api/entries");
-    const j=await r.json();
-    const es=j.entries||[];
+    const { data, error } = await sb.from("entries")
+      .select("id,day,title,emoji,reflection,created_at")
+      .order("day",{ascending:false}).order("created_at",{ascending:false});
+    if(error) throw new Error(error.message);
+    const es = data||[];
     if(!es.length){ box.innerHTML='<div class="empty">还没有存档。先去聊一段，然后「生成复盘并保存」。</div>'; return; }
     const groups={};
     es.forEach(e=>{ (groups[e.day]=groups[e.day]||[]).push(e); });
@@ -496,9 +513,9 @@ async function loadEntries(){
       g.appendChild(head);
       groups[day].forEach(e=>{
         const card=document.createElement("div"); card.className="entrycard";
-        card.innerHTML=`<div class="t">${e.emoji||""} ${escapeHtml(e.title||"复盘")}</div>
-          <div class="r">${escapeHtml((e.reflection||"").slice(0,120))}</div>
-          <div class="meta"><span>${escapeHtml(e.created_at||"")}</span><span class="spacer"></span>
+        card.innerHTML=`<div class="t">${e.emoji||""} ${esc(e.title||"复盘")}</div>
+          <div class="r">${esc((e.reflection||"").slice(0,120))}</div>
+          <div class="meta"><span>${esc((e.created_at||"").replace("T"," ").slice(0,16))}</span><span class="spacer"></span>
             <button class="btn small" data-del="${e.id}">删除</button></div>`;
         g.appendChild(card);
       });
@@ -506,88 +523,83 @@ async function loadEntries(){
     });
     box.querySelectorAll("[data-expday]").forEach(b=>b.onclick=()=>exportDay(b.dataset.expday));
     box.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>delEntry(b.dataset.del));
-  }catch(e){ box.innerHTML='<div class="empty">加载失败：'+escapeHtml(e.message)+'</div>'; }
+  }catch(e){ box.innerHTML='<div class="empty">加载失败：'+esc(e.message)+'</div>'; }
 }
 async function exportDay(day){
-  const r=await api("/api/export?day="+day);
-  const blob=await r.blob();
-  downloadBlob(blob, day+".md");
+  const { data, error } = await sb.from("entries").select("*").eq("day", day).order("created_at");
+  if(error) throw new Error(error.message);
+  if(!data || !data.length){ alert("这一天还没有存档"); return; }
+  downloadBlob(new Blob([dayMd(day, data)], {type:"text/markdown"}), day+".md");
 }
 async function exportRange(){
   const f=$("#expFrom").value, t=$("#expTo").value;
   if(!f||!t){ alert("请选择起始和结束日期"); return; }
-  const r=await api(`/api/export?from=${f}&to=${t}`);
-  const blob=await r.blob();
-  downloadBlob(blob, `rosebud_${f}_to_${t}.zip`);
+  const { data, error } = await sb.from("entries").select("*").gte("day", f).lte("day", t).order("day").order("created_at");
+  if(error) throw new Error(error.message);
+  if(!data || !data.length){ alert("该区间没有存档"); return; }
+  const byDay={};
+  data.forEach(e=>{ (byDay[e.day]=byDay[e.day]||[]).push(e); });
+  const zip = new JSZip();
+  Object.keys(byDay).sort().forEach(d=>zip.file(d+".md", dayMd(d, byDay[d])));
+  const blob = await zip.generateAsync({type:"blob"});
+  downloadBlob(blob, `省身_${f}_至_${t}.zip`);
 }
 async function delEntry(id){
   if(!confirm("删除这条复盘？不可恢复。")) return;
-  await api("/api/entries/"+id,{method:"DELETE"});
+  await sb.from("entries").delete().eq("id", id);
   loadEntries();
 }
-function downloadBlob(blob, name){
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob); a.download=name; a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
-}
 
-/* ---------- 邀请码 ---------- */
+/* ---------- 邀请码（管理员） ---------- */
+function fnHeaders(){ return {"Content-Type":"application/json","Authorization":"Bearer "+accessToken}; }
 async function loadInvites(){
   const box=$("#inviteList"); box.innerHTML='<div class="empty">加载中…</div>';
   try{
-    const r=await api("/api/invites");
+    const r=await fetch(CFG.url.replace(/\/$/,"")+"/functions/v1/invites", {headers: fnHeaders()});
     const j=await r.json();
+    if(!r.ok) throw new Error(j.error||"加载失败");
     const iv=j.invites||[];
     if(!iv.length){ box.innerHTML='<div class="empty">还没有生成过邀请码。</div>'; return; }
     box.innerHTML="";
     iv.forEach(i=>{
       const row=document.createElement("div");
       row.style.cssText="padding:7px 0;border-bottom:1px solid var(--line);font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap";
-      row.innerHTML=`<span class="invitecode">${escapeHtml(i.code)}</span>
-        <span style="color:var(--muted)">${i.used_by?"已使用："+escapeHtml(i.used_by):"未使用"}</span>
-        <span style="color:var(--muted);font-size:12px">${escapeHtml(i.created_at||"")}</span>`;
+      row.innerHTML=`<span class="invitecode">${esc(i.code)}</span>
+        <span style="color:var(--muted)">${i.used_by?"已使用："+esc(i.used_by):"未使用"}</span>
+        <span style="color:var(--muted);font-size:12px">${esc((i.created_at||"").replace("T"," ").slice(0,16))}</span>`;
       box.appendChild(row);
     });
-  }catch(e){ box.innerHTML='<div class="empty">加载失败：'+escapeHtml(e.message)+'</div>'; }
+  }catch(e){ box.innerHTML='<div class="empty">加载失败：'+esc(e.message)+'</div>'; }
 }
 async function genInvite(){
-  const r=await api("/api/invite",{method:"POST",body:JSON.stringify({count:1})});
-  const j=await r.json();
-  if(j.ok && j.codes && j.codes.length){
-    alert("新邀请码："+j.codes[0]+"\n\n发给想用的人，凭它注册。");
-  } else { alert("生成失败："+(j.error||"")); }
+  try{
+    const r=await fetch(CFG.url.replace(/\/$/,"")+"/functions/v1/invites",
+      {method:"POST", headers: fnHeaders(), body: JSON.stringify({count:1})});
+    const j=await r.json();
+    if(!r.ok) throw new Error(j.error||"生成失败");
+    if(j.codes && j.codes.length){
+      alert("新邀请码："+j.codes[0]+"\n\n发给想用的人，凭它注册。");
+    } else { alert("生成失败"); }
+  }catch(e){ alert("生成失败："+e.message); }
   loadInvites();
 }
 
-/* ---------- 模型 / 设置 ---------- */
+/* ---------- 模型 ---------- */
 function setupModelSel(){
   const sel=$("#modelSel"); sel.innerHTML="";
-  models.forEach(m=>{
+  MODELS.forEach(m=>{
     const o=document.createElement("option");
     o.value=m.model; o.textContent=(m.name||m.model)+(m.primary?"（主）":"");
     sel.appendChild(o);
   });
-  if(activeModel) sel.value=activeModel;
+  activeModel = (MODELS.find(m=>m.primary)||MODELS[0]).model;
+  sel.value = activeModel;
   sel.onchange=()=>{ activeModel=sel.value||null; };
-}
-function loadSettings(){
-  $("#setApiBase").value=apiBase;
-}
-function saveSettings(){
-  apiBase=$("#setApiBase").value.trim().replace(/\/$/,"");
-  localStorage.setItem("rb_api",apiBase);
-  $("#settingsMask").classList.remove("show");
-  alert("已保存 API 地址："+(apiBase||"本站"));
 }
 
 /* ---------- 启动 ---------- */
 async function bootAfterAuth(){
-  try{
-    const r=await api("/api/config");
-    const c=await r.json();
-    models=c.models||[]; activeModel=c.active||null;
-    setupModelSel();
-  }catch(e){}
+  setupModelSel();
   refreshMe();
   startMode("evening");
 }
@@ -611,8 +623,6 @@ function bindEvents(){
   $("#expRangeBtn").onclick=exportRange;
   $("#inviteBtn").onclick=()=>{ $("#inviteMask").classList.add("show"); loadInvites(); };
   $("#genInviteBtn").onclick=genInvite;
-  $("#settingsBtn").onclick=()=>{ loadSettings(); $("#settingsMask").classList.add("show"); };
-  $("#saveSettings").onclick=saveSettings;
   $("#helpBtn").onclick=()=>$("#helpMask").classList.add("show");
   $("#copyBtn").onclick=()=>{ navigator.clipboard.writeText($("#previewText").textContent); $("#copyBtn").textContent="已复制✓"; setTimeout(()=>$("#copyBtn").textContent="复制全文",1500); };
   $("#previewExport").onclick=async()=>{ if(lastDay){ try{ await exportDay(lastDay); }catch(e){ alert(e.message); } } };
@@ -621,8 +631,17 @@ function bindEvents(){
 }
 async function boot(){
   bindEvents();
-  if(token){ hideAuth(); bootAfterAuth(); }
+  if(!CFG){
+    $("#authSub").innerHTML = "⚠️ 尚未配置后端（supabase-config.js 为空）。部署步骤见 README。";
+    showAuth(); return;
+  }
+  sb = supabase.createClient(CFG.url, CFG.anon);
+  const { data } = await sb.auth.getSession();
+  if(data && data.session){ useSession(data.session); hideAuth(); bootAfterAuth(); }
   else { showAuth(); }
+  sb.auth.onAuthStateChange((ev, sess)=>{
+    if(ev==="SIGNED_OUT"){ email=""; uid=""; accessToken=""; showAuth(); }
+  });
 }
 boot();
 </script>
