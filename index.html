@@ -120,6 +120,22 @@
   .authcard .field input:focus{border-color:var(--rose);box-shadow:0 0 0 3px var(--rose-soft)}
   .authcard .btn.primary{width:100%;padding:12px;margin-top:8px;font-size:14.5px;border-radius:12px}
 
+  /* 启动诊断条：永远可见 */
+  #bootTrace{position:fixed;left:0;right:0;top:0;background:#1a1a1a;color:#7CFFB2;
+    font:12px ui-monospace,Menlo,Consolas,monospace;padding:8px 14px;z-index:99999;
+    border-bottom:2px solid #444;white-space:pre-wrap;word-break:break-all;line-height:1.5;
+    max-height:55vh;overflow:auto}
+  #bootTrace.collapsed{max-height:30px;overflow:hidden}
+  #bootTrace.err{background:#3a1a1a;border-bottom-color:#c33}
+  #bootTrace .ok{color:#7CFFB2}
+  #bootTrace .warn{color:#FFD66B}
+  #bootTrace .step{display:inline-block;margin-right:8px}
+  #bootTraceToggle{position:fixed;right:12px;top:8px;z-index:100000;
+    background:#333;color:#fff;border:1px solid #555;border-radius:6px;
+    padding:4px 10px;font-size:11px;cursor:pointer}
+  body.hasTrace #mainWrap, body.hasTrace #authMask{padding-top:48px}
+  body.hasTrace.collapsed #mainWrap, body.hasTrace.collapsed #authMask{padding-top:32px}
+
   /* 存档列表 */
   .daygroup{margin:14px 0}
   .dayhead{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;
@@ -163,9 +179,9 @@
 </head>
 <body>
 
-<!-- 启动诊断条：详细报告每一步状态 -->
-<div id="bootTrace" style="display:none"></div>
-<button id="bootTraceToggle" onclick="document.getElementById('bootTrace').classList.toggle('show')">📋 诊断</button>
+<!-- 启动诊断条：永远可见 -->
+<div id="bootTrace"></div>
+<button id="bootTraceToggle" onclick="document.getElementById('bootTrace').classList.toggle('collapsed')">折叠</button>
 
 <!-- 登录 / 注册 -->
 <div class="authmask show" id="authMask">
@@ -717,6 +733,7 @@ async function boot(){
     t.appendChild(line);
   };
   // First show: maybe user wants to see this
+  document.body.classList.add("hasTrace");
   show();
   log(null, "boot() 开始 · " + new Date().toLocaleTimeString());
 
