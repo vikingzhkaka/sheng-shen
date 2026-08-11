@@ -729,17 +729,29 @@ async function delEntry(id){
 
 /* ---------- 邀请码（管理员） ---------- */
 async function fnHeaders(){
-  // 每次现取 fresh JWT；始终 refreshSession 一次（supabase-js 内部只在过期时才真发请求，safe）
+  // 关键：先 getSession 拿现有 token（不会抛），再判断是否需要 refresh
   let token = "";
   try{
     if(!sb) throw new Error("sb 未初始化");
-    const r = await sb.auth.refreshSession();
-    let sess = r.data?.session || (await sb.auth.getSession()).data.session;
+    const g = await sb.auth.getSession();
+    let sess = g.data?.session;
+    if(!sess){ throw new Error("无 session，需要重新登录"); }
+    // 只有将要过期时才主动 refresh（避免每次请求都打 refresh 接口——这就是慢的根因）
+    const now = Math.floor(Date.now()/1000);
+    const exp = sess.expires_at || 0;
+    if(exp < now + 60){
+      try{
+        const r = await sb.auth.refreshSession();
+        sess = r.data?.session || sess;
+      }catch(re){
+        console.warn("[fnHeaders] refreshSession 失败:", re.message, "— 用现有 token 继续");
+      }
+    }
     token = sess?.access_token || "";
     accessToken = token;
     uid = sess?.user?.id || uid;
     email = sess?.user?.email || email;
-    if(!token) console.warn("[fnHeaders] refreshSession 后仍无 token");
+    if(!token) console.warn("[fnHeaders] 没拿到 token");
   }catch(e){
     console.warn("[fnHeaders] 异常:", e.message);
   }
