@@ -477,11 +477,8 @@ async function logout(){
 async function apiCall(apiMessages){
   const body = {messages: apiMessages};
   if(activeModel) body.model = activeModel;
-  const headers = {"Content-Type":"application/json"};
-  if(accessToken){ headers.Authorization = "Bearer "+accessToken; }
-  else{ try{ const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if(t){ headers.Authorization = "Bearer "+t; accessToken=t; } }catch{} }
-  const r = await fetch(CFG.url.replace(/\/$/,"")+"/functions/v1/chat",
-    {method:"POST", headers, body: JSON.stringify(body)});
+  const r = await apiFetch(CFG.url.replace(/\/$/,"")+"/functions/v1/chat",
+    {method:"POST", body: JSON.stringify(body)});
   const j = await r.json();
   if(!r.ok) throw new Error(j.error || ("对话失败 " + r.status));
   return j.content;
@@ -696,10 +693,28 @@ async function delEntry(id){
 }
 
 /* ---------- 邀请码（管理员） ---------- */
+// 统一 fetch：遇到 401 自动 refresh 后重试一次（不依赖客户端时钟判断过期）
+async function apiFetch(path, options){
+  options = options || {};
+  let headers = options.headers || {"Content-Type":"application/json"};
+  if(!headers.Authorization) headers.Authorization = "Bearer "+(accessToken||"");
+  let r = await fetch(path, {...options, headers});
+  if(r.status === 401){
+    console.warn("[apiFetch] 401，尝试 refresh 后重试");
+    try{
+      const rr = await sb.auth.refreshSession();
+      if(rr.data?.session){
+        accessToken = rr.data.session.access_token;
+        headers = {...headers, "Authorization":"Bearer "+accessToken};
+        r = await fetch(path, {...options, headers});
+      }
+    }catch(e){ console.warn("[apiFetch] refresh 失败:", e.message); }
+  }
+  return r;
+}
 async function fnHeaders(){
-  // 简单方案：就用 useSession 存下的 accessToken，过期让服务端报 401
+  // 简单方案：用现有 token，过期判断交给 apiFetch 的 401 重试
   if(!accessToken){
-    // 尝试从 supabase 客户端补拿一次
     try{ const { data } = await sb.auth.getSession(); accessToken = data.session?.access_token || ""; }catch{}
   }
   return {"Content-Type":"application/json", "Authorization":"Bearer "+accessToken};
@@ -707,12 +722,10 @@ async function fnHeaders(){
 async function loadInvites(){
   const box=$("#inviteList"); box.innerHTML='<div class="empty">加载中…</div>';
   try{
-    const headers = await fnHeaders();
-    // sb.functions.invoke 走 .functions.supabase.co 子域名——我们的项目不存在这个 DNS！
-    // 必须用 apikey 项目根域名的 /functions/v1/ 路径（已验证可达）
-    const r = await fetch(CFG.url.replace(/\/$/,"")+"/functions/v1/invites", {headers});
-    const j = await r.json();
-    if(!r.ok) throw new Error(j.error || ("加载失败 HTTP "+r.status));
+    const r = await apiFetch(CFG.url.replace(/\/$/,"")+"/functions/v1/invites");
+    const txt = await r.text();
+    let j; try{j = JSON.parse(txt);}catch{ j = {error:"非JSON响应："+txt.slice(0,200)}; }
+    if(!r.ok) throw new Error(`HTTP ${r.status}: ${j.error || ("无 error 字段，body="+txt.slice(0,100))}`);
     const iv = j.invites || [];
     if(!iv.length){ box.innerHTML='<div class="empty">还没有生成过邀请码。</div>'; return; }
     box.innerHTML="";
@@ -730,11 +743,11 @@ async function loadInvites(){
 }
 async function genInvite(){
   try{
-    const headers = await fnHeaders();
-    const r = await fetch(CFG.url.replace(/\/$/,"")+"/functions/v1/invites",
-      {method:"POST", headers, body: JSON.stringify({count:1})});
-    const j = await r.json();
-    if(!r.ok) throw new Error(j.error || ("生成失败 HTTP "+r.status));
+    const r = await apiFetch(CFG.url.replace(/\/$/,"")+"/functions/v1/invites",
+      {method:"POST", body: JSON.stringify({count:1})});
+    const txt = await r.text();
+    let j; try{j = JSON.parse(txt);}catch{ j = {error:"非JSON响应："+txt.slice(0,200)}; }
+    if(!r.ok) throw new Error(`HTTP ${r.status}: ${j.error || ("无 error 字段，body="+txt.slice(0,100))}`);
     if(j.codes && j.codes.length){
       alert("新邀请码："+j.codes[0]+"\n\n发给想用的人，凭它注册。");
     } else { alert("生成失败：返回为空"); }
