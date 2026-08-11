@@ -500,11 +500,18 @@ async function apiCall(apiMessages){
   const body = {messages: apiMessages};
   if(activeModel) body.model = activeModel;
   const headers = {"Content-Type":"application/json"};
-  // 拿 fresh JWT
   try{
+    if(!sb) throw new Error("sb not ready");
+    let sess = null;
     const { data } = await sb.auth.getSession();
-    if(data.session?.access_token){ headers.Authorization = "Bearer "+data.session.access_token; accessToken = data.session.access_token; }
-  }catch{}
+    sess = data.session;
+    const now = Math.floor(Date.now()/1000);
+    if(!sess || (sess.expires_at && sess.expires_at < now + 60)){
+      const r = await sb.auth.refreshSession();
+      sess = r.data.session;
+    }
+    if(sess?.access_token){ headers.Authorization = "Bearer "+sess.access_token; accessToken = sess.access_token; }
+  }catch(e){ console.warn("[apiCall] 取 JWT 失败:", e.message); }
   const r = await fetch(CFG.url.replace(/\/$/,"")+"/functions/v1/chat",
     {method:"POST", headers, body: JSON.stringify(body)});
   const j = await r.json();
@@ -722,15 +729,26 @@ async function delEntry(id){
 
 /* ---------- 邀请码（管理员） ---------- */
 async function fnHeaders(){
-  // 每次调用前从 supabase 客户端拿 fresh JWT（自动处理过期刷新）
+  // 每次现取 fresh JWT；过期时主动 refreshSession 强制刷新
   let token = "";
   try{
+    if(!sb) throw new Error("sb not ready");
+    let sess = null;
     const { data } = await sb.auth.getSession();
-    token = data.session?.access_token || "";
+    sess = data.session;
+    // 检查是否过期（expires_at 是 unix 秒，提前 60s 视为过期）
+    const now = Math.floor(Date.now()/1000);
+    if(!sess || (sess.expires_at && sess.expires_at < now + 60)){
+      const r = await sb.auth.refreshSession();
+      sess = r.data.session;
+    }
+    token = sess?.access_token || "";
     accessToken = token;
-    uid = data.session?.user?.id || uid;
-    email = data.session?.user?.email || email;
-  }catch{}
+    uid = sess?.user?.id || uid;
+    email = sess?.user?.email || email;
+  }catch(e){
+    console.warn("[fnHeaders] 拿不到 fresh JWT:", e.message);
+  }
   return {"Content-Type":"application/json", "Authorization":"Bearer "+token};
 }
 async function loadInvites(){
