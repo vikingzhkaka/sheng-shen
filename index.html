@@ -121,22 +121,6 @@
   .authcard .field input:focus{border-color:var(--rose);box-shadow:0 0 0 3px var(--rose-soft)}
   .authcard .btn.primary{width:100%;padding:12px;margin-top:8px;font-size:14.5px;border-radius:12px}
 
-  /* 启动诊断条：永远可见 */
-  #bootTrace{position:fixed;left:0;right:0;top:0;background:#1a1a1a;color:#7CFFB2;
-    font:12px ui-monospace,Menlo,Consolas,monospace;padding:8px 14px;z-index:99999;
-    border-bottom:2px solid #444;white-space:pre-wrap;word-break:break-all;line-height:1.5;
-    max-height:55vh;overflow:auto}
-  #bootTrace.collapsed{max-height:30px;overflow:hidden}
-  #bootTrace.err{background:#3a1a1a;border-bottom-color:#c33}
-  #bootTrace .ok{color:#7CFFB2}
-  #bootTrace .warn{color:#FFD66B}
-  #bootTrace .step{display:inline-block;margin-right:8px}
-  #bootTraceToggle{position:fixed;right:12px;top:8px;z-index:100000;
-    background:#333;color:#fff;border:1px solid #555;border-radius:6px;
-    padding:4px 10px;font-size:11px;cursor:pointer}
-  body.hasTrace #mainWrap, body.hasTrace #authMask{padding-top:48px}
-  body.hasTrace.collapsed #mainWrap, body.hasTrace.collapsed #authMask{padding-top:32px}
-
   /* 存档列表 */
   .daygroup{margin:14px 0}
   .dayhead{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;
@@ -180,10 +164,6 @@
 </head>
 <body>
 
-<!-- 启动诊断条：永远可见 -->
-<div id="bootTrace"></div>
-<button id="bootTraceToggle" onclick="document.getElementById('bootTrace').classList.toggle('collapsed')">折叠</button>
-
 <!-- 登录 / 注册 -->
 <div class="authmask show" id="authMask">
   <div class="authcard">
@@ -192,8 +172,6 @@
       <span class="bn">省身</span>
     </div>
 
-    <!-- 启动状态卡：登录框顶部永远显示 -->
-    <div id="bootStatus" style="background:#1a1a1a;color:#7CFFB2;border-radius:8px;padding:10px 12px;margin:14px 0;font:12px ui-monospace,Menlo,Consolas,monospace;line-height:1.7;border:1px solid #333">⏳ 启动中…</div>
     <div class="sub" id="authSub">每日三省 · 照见自己 · 数据只属于你的账户</div>
     <div class="tabs">
       <div class="tab active" id="tabLogin">登录</div>
@@ -500,20 +478,8 @@ async function apiCall(apiMessages){
   const body = {messages: apiMessages};
   if(activeModel) body.model = activeModel;
   const headers = {"Content-Type":"application/json"};
-  try{
-    if(!sb) throw new Error("sb not ready");
-    const { data } = await sb.auth.getSession();
-    let sess = data.session;
-    const now = Math.floor(Date.now()/1000);
-    // 只在 expires_at 存在且临近过期才 refresh（避免无谓的慢）
-    if(sess && typeof sess.expires_at === "number" && sess.expires_at < now + 60){
-      try{
-        const r = await sb.auth.refreshSession();
-        sess = r.data?.session || sess;
-      }catch(re){ console.warn("[apiCall] refreshSession 失败:", re.message); }
-    }
-    if(sess?.access_token){ headers.Authorization = "Bearer "+sess.access_token; accessToken = sess.access_token; }
-  }catch(e){ console.warn("[apiCall] 取 JWT 失败:", e.message); }
+  if(accessToken){ headers.Authorization = "Bearer "+accessToken; }
+  else{ try{ const { data } = await sb.auth.getSession(); const t = data.session?.access_token; if(t){ headers.Authorization = "Bearer "+t; accessToken=t; } }catch{} }
   const r = await fetch(CFG.url.replace(/\/$/,"")+"/functions/v1/chat",
     {method:"POST", headers, body: JSON.stringify(body)});
   const j = await r.json();
@@ -731,33 +697,12 @@ async function delEntry(id){
 
 /* ---------- 邀请码（管理员） ---------- */
 async function fnHeaders(){
-  // 关键：先 getSession 拿现有 token（不会抛），再判断是否需要 refresh
-  let token = "";
-  try{
-    if(!sb) throw new Error("sb 未初始化");
-    const g = await sb.auth.getSession();
-    let sess = g.data?.session;
-    if(!sess){ throw new Error("无 session，需要重新登录"); }
-    // 只有 expires_at 存在且真的要过期时才 refresh；缺字段则不 refresh（避免每次都打 refresh 接口）
-    const now = Math.floor(Date.now()/1000);
-    const exp = sess.expires_at;
-    if(typeof exp === "number" && exp < now + 60){
-      try{
-        const r = await sb.auth.refreshSession();
-        sess = r.data?.session || sess;
-      }catch(re){
-        console.warn("[fnHeaders] refreshSession 失败:", re.message, "— 用现有 token 继续");
-      }
-    }
-    token = sess?.access_token || "";
-    accessToken = token;
-    uid = sess?.user?.id || uid;
-    email = sess?.user?.email || email;
-    if(!token) console.warn("[fnHeaders] 没拿到 token");
-  }catch(e){
-    console.warn("[fnHeaders] 异常:", e.message);
+  // 简单方案：就用 useSession 存下的 accessToken，过期让服务端报 401
+  if(!accessToken){
+    // 尝试从 supabase 客户端补拿一次
+    try{ const { data } = await sb.auth.getSession(); accessToken = data.session?.access_token || ""; }catch{}
   }
-  return {"Content-Type":"application/json", "Authorization":"Bearer "+token};
+  return {"Content-Type":"application/json", "Authorization":"Bearer "+accessToken};
 }
 async function loadInvites(){
   const box=$("#inviteList"); box.innerHTML='<div class="empty">加载中…</div>';
@@ -862,105 +807,16 @@ function bindEvents(){
   bindAll(".mask", (m,e)=>{ if(e.target===m) m.classList.remove("show"); });
 }
 async function boot(){
-  const t = $("#bootTrace");
-  const s = $("#bootStatus");
-  const show = () => { t.classList.add("show"); s.style.display="block"; };
-  const sym = ok => ok===true?'✓':(ok===false?'✗':'·');
-  const log = (ok, msg) => {
-    const line = document.createElement("div");
-    line.innerHTML = `<span class="step">${sym(ok)}</span>${msg}`;
-    t.appendChild(line);
-    if(s){
-      const l2 = document.createElement("div");
-      l2.innerHTML = `${sym(ok)} ${msg}`;
-      s.appendChild(l2);
-    }
-  };
-  // First show: maybe user wants to see this
-  document.body.classList.add("hasTrace");
-  show();
-  log(null, "boot() 开始 · " + new Date().toLocaleTimeString());
-
-  // Step 0: CFG
-  try {
-    log(typeof CFG !== "undefined" && CFG && CFG.url, "CFG: " + (typeof CFG !== "undefined" ? (CFG ? "url="+CFG.url.slice(0,40)+"…" : "空对象") : "未定义"));
-    if(typeof CFG === "undefined" || !CFG || !CFG.url){
-      t.classList.add("err"); s.style.background="#3a1a1a"; s.style.borderColor="#c33";
-      log(false, "→ 缺 supabase-config.js 或 url 字段为空。");
-      $("#authSub").innerHTML = "⚠️ 后端未配置（supabase-config.js 缺 CFG.url）。";
-      showAuth(); return;
-    }
-  } catch(e){ log(false, "CFG 步骤抛错: " + e.message); showAuth(); return; }
-
-  // Step 1: supabase global
-  try {
-    bindEvents(); log(true, "bindEvents 已挂载 ✓");
-  } catch(e){ t.classList.add("err"); log(false, "bindEvents 抛错: " + e.message); showAuth(); return; }
-
-  const supBaseOk = typeof supabase !== "undefined";
-  log(supBaseOk, "supabase 全局变量: " + (supBaseOk ? "已挂载 ✓" : "未定义 ✗"));
-
-  if(!supBaseOk){
-    log(null, "→ 主动探测 vendor/supabase.min.js（看是你的网还是 CDN 缓存）");
-    try {
-      const r = await fetch("vendor/supabase.min.js?_t="+Date.now(), {cache:"no-store"});
-      const txt = await r.text();
-      log(r.ok, `  fetch ${r.status} · ${txt.length} bytes · 头 60 字节: ${txt.slice(0,60).replace(/\n/g,'⏎')}`);
-      if(r.ok){
-        log(null, "→ fetch 拿到了，但页面加载时 supabase 居然没挂上。手动执行一次再赋值：");
-        try {
-          const se = document.createElement("script");
-          se.textContent = txt;
-          document.head.appendChild(se);
-          log(typeof supabase !== "undefined" && typeof supabase.createClient === "function", "  手动执行后 supabase: " + (typeof supabase !== "undefined" ? "已挂载" : "仍然未挂载"));
-        }catch(ev){ log(false, "  手动执行抛错: " + ev.message); }
-      }
-    } catch(ev){
-      log(false, "  fetch vendor/supabase.min.js 失败: " + ev.message + " — 多半是网络拦截。");
-    }
-
-    if(typeof supabase === "undefined" || typeof supabase.createClient !== "function"){
-      t.classList.add("err"); s.style.background="#3a1a1a"; s.style.borderColor="#c33";
-      $("#authSub").innerHTML = "⚠️ Supabase SDK 加载失败 — 见上方启动卡";
-      showAuth(); return;
-    }
-  } else {
-    const ccOk = typeof supabase.createClient === "function";
-    log(ccOk, "supabase.createClient: " + (ccOk ? "是函数 ✓" : "不是函数 ✗"));
-    if(!ccOk){ t.classList.add("err"); showAuth(); return; }
-  }
-
-  // Step 2: createClient
-  try{
-    sb = supabase.createClient(CFG.url, CFG.anon);
-    log(true, "sb = supabase.createClient 已就绪 ✓");
-  }catch(e){
-    t.classList.add("err"); s.style.background="#3a1a1a"; s.style.borderColor="#c33";
-    log(false, "createClient 抛错: " + e.message);
-    $("#authSub").innerHTML = "⚠️ Supabase 客户端初始化失败: " + e.message;
-    showAuth(); return;
-  }
-
-  // Step 3: session
+  bindEvents();
+  if(!CFG || !CFG.url){ $("#authSub").innerHTML = "⚠️ 后端未配置"; showAuth(); return; }
+  if(typeof supabase === "undefined" || !supabase.createClient){ $("#authSub").innerHTML = "⚠️ Supabase SDK 加载失败"; showAuth(); return; }
+  try{ sb = supabase.createClient(CFG.url, CFG.anon); }catch(e){ $("#authSub").innerHTML = "⚠️ 初始化失败: "+e.message; showAuth(); return; }
   try{
     const { data } = await sb.auth.getSession();
-    if(data && data.session){
-      log(true, "已有会话（refreshMe 即将填资料）");
-      useSession(data.session); hideAuth(); bootAfterAuth();
-    } else {
-      log(true, "无会话 → 弹出登录框");
-      // Hide the diagnostic card now that we're ready
-      s.style.display = "none";
-      showAuth();
-    }
-  }catch(e){
-    t.classList.add("err"); s.style.background="#3a1a1a"; s.style.borderColor="#c33";
-    log(false, "getSession 抛错: " + e.message);
-    showAuth();
-  }
-  sb.auth.onAuthStateChange((ev, sess)=>{
-    if(ev==="SIGNED_OUT"){ email=""; uid=""; accessToken=""; showAuth(); }
-  });
+    if(data && data.session){ useSession(data.session); hideAuth(); bootAfterAuth(); }
+    else { showAuth(); }
+  }catch(e){ showAuth(); }
+  sb.auth.onAuthStateChange((ev, sess)=>{ if(ev==="SIGNED_OUT"){ email=""; uid=""; accessToken=""; showAuth(); } });
 }
 boot();
 </script>
