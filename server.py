@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Rosebud Cloud —— 多用户版复盘工具（仅 Python 标准库 + SQLite）
+省身 —— 多用户版复盘工具（每日三省吾身）（仅 Python 标准库 + SQLite）
 
 能力：
 - 邮箱+密码注册（需邀请码）、登录、会话（Bearer token，30 天）
@@ -211,7 +211,7 @@ def active_model(name=None):
 
 # ---------- 导出 ----------
 def entry_to_md(e) -> str:
-    lines = [f"## {e['emoji'] or '🌹'} {e['title'] or '复盘'}", f"### {e['created_at']}", "",
+    lines = [f"## {e['emoji'] or '🌿'} {e['title'] or '复盘'}", f"### {e['created_at']}", "",
              "#### Tags",
              f"**Emotions:** {e['emotions'] or ''}",
              f"**People:** {e['people'] or ''}",
@@ -223,8 +223,8 @@ def entry_to_md(e) -> str:
 
 
 def day_md(day: str, entries) -> str:
-    parts = [f"---\ndate: {day}\ntype: rosebud-daily\ntags: [复盘日记]\n---\n",
-             f"# 🌹 Rosebud · {day}\n"]
+    parts = [f"---\ndate: {day}\ntype: sheng-shen-daily\ntags: [复盘日记]\n---\n",
+             f"# 省身 · {day}\n"]
     parts.append("\n\n---\n\n".join(entry_to_md(e) for e in entries))
     return "\n".join(parts)
 
@@ -577,13 +577,13 @@ def main():
     if not any(m.get("api_key") for m in CONFIG["MODELS"]):
         print("[提示] 未检测到 SENSENOVA_API_KEY，AI 教练不可用（注册/存档/导出不受影响）。")
     active = active_model()
-    print(f"[Rosebud Cloud] http://localhost:{CONFIG['PORT']}  DB={DB_PATH}")
+    print(f"[省身] http://localhost:{CONFIG['PORT']}  DB={DB_PATH}")
     if active:
-        print(f"[Rosebud Cloud] 主模型: {active['name']} ({active['model']})")
+        print(f"[省身] 主模型: {active['name']} ({active['model']})")
     try:
         http.server.ThreadingHTTPServer(("0.0.0.0", CONFIG["PORT"]), Handler).serve_forever()
     except KeyboardInterrupt:
-        print("\n[Rosebud Cloud] 已停止。")
+        print("\n[省身] 已停止。")
 
 
 if __name__ == "__main__":

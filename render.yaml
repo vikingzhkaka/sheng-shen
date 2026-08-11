@@ -1,10 +1,10 @@
-# Rosebud Cloud —— Render 一键部署清单
+# 省身 —— Render 一键部署清单
 # 用法：在 Render 里 New > Blueprint，连接本仓库后自动读取本文件。
 # 更简单的做法：New > Web Service > 选本仓库，runtime 选 Python，Start Command 填 python server.py。
 
 services:
   - type: web
-    name: rosebud-cloud
+    name: sheng-shen
     runtime: python
     plan: free
     startCommand: python server.py

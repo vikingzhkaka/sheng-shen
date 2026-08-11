@@ -3,19 +3,21 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>🌹 Rosebud Cloud</title>
+<title>省身 · 每日三省</title>
+<link rel="icon" type="image/svg+xml" href="logo-mark.svg" />
 <style>
   :root{
-    --bg:#fdf7f8; --panel:#ffffff; --ink:#2b2326; --muted:#8a7a7e;
-    --rose:#c2185b; --rose-soft:#f7e3ea; --rose-line:#f0cdd9;
-    --line:#efe6e9; --chip:#fbeef3; --ok:#2e9e6b; --err:#c62828;
+    --bg:#f4f9f8; --panel:#ffffff; --ink:#22312f; --muted:#7c918d;
+    --rose:#2f6b6a; --rose-soft:#e2efec; --rose-line:#c6ddd9;
+    --line:#e4efec; --chip:#e9f3f0; --ok:#2e9e6b; --err:#c62828;
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
     background:var(--bg);color:var(--ink);height:100vh;display:flex;flex-direction:column}
   header{display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:1px solid var(--line);
-    background:linear-gradient(180deg,#fff, #fdf3f6);flex-wrap:wrap}
-  header h1{font-size:17px;margin:0;font-weight:700}
+    background:linear-gradient(180deg,#fff, #eef6f4);flex-wrap:wrap}
+  header h1{font-size:17px;margin:0;font-weight:700;display:flex;align-items:center;gap:6px}
+  header .brandlogo{height:22px;width:22px}
   header .sub{font-size:12px;color:var(--muted)}
   header .spacer{flex:1}
   header .who{font-size:12px;color:var(--muted)}
@@ -106,8 +108,8 @@
 <!-- ============ 登录 / 注册 ============ -->
 <div class="authmask show" id="authMask">
   <div class="authcard">
-    <h1>🌹 Rosebud Cloud</h1>
-    <div class="sub">私人复盘教练 · 数据只属于你的账户</div>
+    <h1>省身</h1>
+    <div class="sub">每日三省 · 照见自己 · 数据只属于你的账户</div>
     <div class="tabs">
       <div class="tab active" id="tabLogin">登录</div>
       <div class="tab" id="tabRegister">注册</div>
@@ -135,7 +137,7 @@
 
 <!-- ============ 主界面 ============ -->
 <header id="mainHeader" style="display:none">
-  <h1>🌹 Rosebud</h1><span class="sub">私人复盘 · 苏格拉底式教练</span>
+  <h1><img class="brandlogo" src="logo-mark.svg" alt="省身" />省身</h1><span class="sub">每日三省 · 照见自己</span>
   <span class="modelwrap">模型
     <select id="modelSel"><option>加载中…</option></select>
   </span>
@@ -215,7 +217,7 @@
 <!-- 说明 modal -->
 <div class="mask" id="helpMask">
   <div class="modal">
-    <h2>🌹 这是什么</h2>
+    <h2>☯ 这是什么</h2>
     <p class="hint">
       一个多用户版「复盘教练」。注册后用引导式提问把一天的事、担忧和觉察聊出来，
       最后沉淀成带 <b>Reflection</b> 和 <b>Tags</b> 的结构化 markdown，<b>存进你自己的账户</b>，
@@ -344,7 +346,7 @@ function escapeHtml(s){ return s.replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','
 function addMsg(role, text, typing=false){
   const d=document.createElement("div");
   d.className="msg "+role+(typing?" typing":"");
-  d.innerHTML=`<span class="who">${role==='rosebud'?'Rosebud':'你'}</span>`+escapeHtml(text);
+  d.innerHTML=`<span class="who">${role==='rosebud'?'省身':'你'}</span>`+escapeHtml(text);
   chatEl.appendChild(d); scrollBottom(); return d;
 }
 async function apiCall(apiMessages){
@@ -356,9 +358,9 @@ async function apiCall(apiMessages){
 }
 function persona(){
   const modeName = {morning:"晨间规划",evening:"晚间复盘",free:"自由对话"}[mode];
-  return `你是一位名为 Rosebud 的私人复盘教练，陪伴用户进行每日反思与自我觉察。
+  return `你是一位名为「省身」的私人复盘教练（典出《论语》"吾日三省吾身"），陪伴用户进行每日反思与自我觉察。
 你的风格：
-- 苏格拉底式引导：多提问、少给结论；用温和的追问帮助用户自己看清想法，而不是直接下判断。
+- 三省吾身式引导：多提问、少给结论；用温和的追问帮助用户自己看清想法，而不是直接下判断。
 - 温暖、真诚、不评判。认可他的努力与觉察，但不过度恭维。
 - 用中文，语气自然像一位有智慧的同行者。
 - 当用户说「提出一些建议 / 提供不同的观点 / 进一步分析 / 建议下一步 / 帮我思考一下这个问题」时，相应切换视角展开，但仍以引导和提问为主，结尾留一个开放性问题。
@@ -391,18 +393,18 @@ async function sendUser(text){
     if(queue.length===0) phase="free";
   } else if(phase==="scripted" && queue.length===0){
     phase="free";
-    directive="（引导问题已全部问完，现在转入自由复盘对话，继续用苏格拉底式提问陪伴用户深入探索。）";
+    directive="（引导问题已全部问完，现在转入自由复盘对话，继续用三省吾身式提问陪伴用户深入探索。）";
   }
   if(directive) apiMessages.push({role:"system", content:directive});
   const typingEl=addMsg("rosebud","思考中…",true);
   try{
     const reply=await apiCall(apiMessages);
     typingEl.classList.remove("typing");
-    typingEl.innerHTML=`<span class="who">Rosebud</span>`+escapeHtml(reply);
+    typingEl.innerHTML=`<span class="who">省身</span>`+escapeHtml(reply);
     messages.push({role:"rosebud", text:reply});
   }catch(e){
     typingEl.classList.remove("typing");
-    typingEl.innerHTML=`<span class="who">Rosebud</span>⚠️ ${escapeHtml(e.message)}`;
+    typingEl.innerHTML=`<span class="who">省身</span>⚠️ ${escapeHtml(e.message)}`;
   }
   busy=false; setChipsEnabled(true); $("#sendBtn").disabled=false; scrollBottom();
 }
@@ -416,11 +418,11 @@ function quickAction(act){
   const typingEl=addMsg("rosebud","思考中…",true);
   apiCall(apiMessages).then(reply=>{
     typingEl.classList.remove("typing");
-    typingEl.innerHTML=`<span class="who">Rosebud</span>`+escapeHtml(reply);
+    typingEl.innerHTML=`<span class="who">省身</span>`+escapeHtml(reply);
     messages.push({role:"rosebud", text:reply});
   }).catch(e=>{
     typingEl.classList.remove("typing");
-    typingEl.innerHTML=`<span class="who">Rosebud</span>⚠️ ${escapeHtml(e.message)}`;
+    typingEl.innerHTML=`<span class="who">省身</span>⚠️ ${escapeHtml(e.message)}`;
   }).finally(()=>{ busy=false; setChipsEnabled(true); $("#sendBtn").disabled=false; scrollBottom(); });
 }
 
@@ -440,7 +442,7 @@ function extractJson(text){
 async function generate(){
   if(busy || messages.length===0){ alert("先聊一会儿，再生成复盘～"); return; }
   busy=true; $("#genBtn").disabled=true;
-  const transcript=messages.map(m=>`**${m.role==='rosebud'?'Rosebud':'viking'}:** ${m.text}`).join("\n");
+  const transcript=messages.map(m=>`**${m.role==='rosebud'?'省身':'viking'}:** ${m.text}`).join("\n");
   const sys=`你是复盘整理助手。请基于下面的对话，提炼结构化复盘元数据，仅输出一个 JSON 对象，不要任何多余文字。
 字段：
 - title: 简短中文标题（8-16字，概括这次复盘的核心主题）
@@ -458,14 +460,14 @@ async function generate(){
   if(!meta){ alert("AI 未返回可解析的 JSON，请重试。"); busy=false; $("#genBtn").disabled=false; return; }
   const day=td();
   lastDay=day;
-  const md = `## ${meta.emoji||"🌹"} ${meta.title||"复盘"}\n### ${formatDate(new Date())}\n\n#### Tags\n**Emotions:** ${(meta.emotions||[]).join(", ")}\n**People:** ${(meta.people&&meta.people.length)?meta.people.join(", "):"—"}\n**Topics:** ${(meta.topics||[]).join(", ")}\n\n#### Reflection\n${meta.reflection||""}\n\n#### Entry\n${transcript}\n`;
+  const md = `## ${meta.emoji||"🌿"} ${meta.title||"复盘"}\n### ${formatDate(new Date())}\n\n#### Tags\n**Emotions:** ${(meta.emotions||[]).join(", ")}\n**People:** ${(meta.people&&meta.people.length)?meta.people.join(", "):"—"}\n**Topics:** ${(meta.topics||[]).join(", ")}\n\n#### Reflection\n${meta.reflection||""}\n\n#### Entry\n${transcript}\n`;
   lastMd = md;
   $("#previewText").textContent = md;
   $("#saveStatus").textContent = "";
   $("#previewMask").classList.add("show");
   try{
     const r = await api("/api/save",{method:"POST",body:JSON.stringify({
-      day, title: meta.title||"复盘", emoji: meta.emoji||"🌹",
+      day, title: meta.title||"复盘", emoji: meta.emoji||"🌿",
       emotions: meta.emotions||[], people: meta.people||[], topics: meta.topics||[],
       reflection: meta.reflection||"", transcript
     })});
