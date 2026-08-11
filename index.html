@@ -736,7 +736,7 @@ async function fnHeaders(){
 async function loadInvites(){
   const box=$("#inviteList"); box.innerHTML='<div class="empty">加载中…</div>';
   try{
-    const r=await fetch(CFG.url.replace(/\/$/,"")+"/functions/v1/invites", {headers: fnHeaders()});
+    const r=await fetch(CFG.url.replace(/\/$/,"")+"/functions/v1/invites", {headers: await fnHeaders()});
     const j=await r.json();
     if(!r.ok) throw new Error(j.error||"加载失败");
     const iv=j.invites||[];
@@ -755,7 +755,7 @@ async function loadInvites(){
 async function genInvite(){
   try{
     const r=await fetch(CFG.url.replace(/\/$/,"")+"/functions/v1/invites",
-      {method:"POST", headers: fnHeaders(), body: JSON.stringify({count:1})});
+      {method:"POST", headers: await fnHeaders(), body: JSON.stringify({count:1})});
     const j=await r.json();
     if(!r.ok) throw new Error(j.error||"生成失败");
     if(j.codes && j.codes.length){
