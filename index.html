@@ -26,6 +26,9 @@
   header .sub{font-size:12px;color:var(--muted)}
   header .spacer{flex:1}
   header .who{font-size:12px;color:var(--muted)}
+  .header-more{position:relative;display:flex;align-items:center;gap:8px}
+  .header-more .more-menu{display:flex;gap:8px;align-items:center}
+  #moreBtn{display:none}
   .btn{border:1px solid var(--rose-line);background:#fff;color:var(--rose);border-radius:10px;
     padding:7px 12px;font-size:13px;cursor:pointer;transition:.15s}
   .btn:hover{background:var(--rose-soft)}
@@ -35,18 +38,33 @@
   .btn.small{padding:4px 9px;font-size:12px;border-radius:8px}
   .btn.icon{padding:6px 10px;font-size:16px;line-height:1}
 
-  #mainWrap{flex:1;display:flex;flex-direction:column;min-height:0}
+  #mainWrap{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
   .modes{display:flex;gap:8px;padding:12px 20px 0;flex-wrap:wrap}
   .mode{border:1px solid var(--line);background:#fff;border-radius:12px;padding:9px 14px;cursor:pointer;
     font-size:13px;color:var(--muted);transition:.15s}
   .mode.active{border-color:var(--rose);color:var(--rose);background:var(--rose-soft);font-weight:600}
 
-  .chat{flex:1;overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;gap:14px;min-height:0}
-  .msg{max-width:78%;padding:11px 14px;border-radius:14px;line-height:1.6;font-size:14.5px;white-space:pre-wrap;word-break:break-word}
-  .msg.rosebud{align-self:flex-start;background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:4px}
-  .msg.viking{align-self:flex-end;background:var(--rose);color:#fff;border-bottom-right-radius:4px}
+  .chat{flex:1;overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;gap:14px;min-height:0;
+    overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;scrollbar-color:var(--rose-line) transparent}
+  .chat::-webkit-scrollbar{width:8px}
+  .chat::-webkit-scrollbar-thumb{background:var(--rose-line);border-radius:8px}
+  .chat::-webkit-scrollbar-track{background:transparent}
+  .msg{display:flex;gap:8px;align-items:flex-end;max-width:82%;font-size:14.5px;line-height:1.6}
+  .msg.rosebud{align-self:flex-start}
+  .msg.viking{align-self:flex-end}
+  .msg .avatar{width:30px;height:30px;flex:0 0 auto;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;font-size:16px;background:var(--chip);border:1px solid var(--rose-line)}
+  .msg .bubble{max-width:100%;padding:11px 14px;border-radius:14px;white-space:pre-wrap;word-break:break-word}
+  .msg.rosebud .bubble{background:var(--rose-soft);border:1px solid var(--rose-line);border-left:3px solid var(--rose);border-bottom-left-radius:4px}
+  .msg.viking .bubble{background:var(--rose);color:#fff;border-bottom-right-radius:4px}
   .msg .who{display:block;font-size:11px;opacity:.6;margin-bottom:3px}
-  .typing{font-style:italic;color:var(--muted)}
+  .typing-dots{display:inline-flex;gap:4px;align-items:center;margin-left:6px;vertical-align:middle}
+  .typing-dots span{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:bk 1.2s infinite ease-in-out}
+  .typing-dots span:nth-child(2){animation-delay:.2s}
+  .typing-dots span:nth-child(3){animation-delay:.4s}
+  @keyframes bk{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+  @media (prefers-reduced-motion: reduce){ .typing-dots span{animation:none;opacity:.5} }
 
   .chips{display:flex;gap:8px;flex-wrap:wrap;padding:8px 20px 0}
   .chip{border:1px solid var(--rose-line);background:var(--chip);color:var(--rose);border-radius:999px;
@@ -56,8 +74,8 @@
 
   /* 输入区（ChatGPT 风格：textarea 在上，工具条在下） */
   .compose{display:flex;flex-direction:column;gap:8px;padding:14px 20px 16px;border-top:1px solid var(--line);background:#fff}
-  .compose textarea{resize:none;height:48px;max-height:160px;border:1px solid var(--line);
-    border-radius:14px;padding:12px 14px;font:inherit;font-size:14px;outline:none;background:#fff}
+  .compose textarea{resize:none;height:52px;max-height:180px;border:1px solid var(--line);
+    border-radius:14px;padding:13px 14px;font:inherit;font-size:16px;line-height:1.5;outline:none;background:#fff}
   .compose textarea:focus{border-color:var(--rose-line)}
   .compose-bar{display:flex;align-items:center;gap:10px}
 
@@ -150,7 +168,7 @@
     .chips{padding:8px 14px 0;gap:6px}
     .chip{padding:5px 10px;font-size:12px}
     .compose{padding:10px 14px 14px}
-    .compose textarea{height:46px;font-size:16px}
+    .compose textarea{height:58px;font-size:16px}
     .compose-bar{gap:6px;flex-wrap:wrap}
     /* 移动端：模型胶囊+📎 占上行，生成/发送各占底行 50%，窄屏也不溢出/不裁字 */
     #genBtn, #sendBtn{flex:1 1 auto;min-width:0}
@@ -164,6 +182,12 @@
     input, textarea{font-size:16px !important}
     .authcard .sub{font-size:12.5px;margin-bottom:18px}
     .mask{padding:14px}
+    .msg .avatar{width:26px;height:26px;font-size:14px}
+    .header-more .more-menu{display:none;position:absolute;top:calc(100% + 8px);right:0;flex-direction:column;
+      align-items:stretch;background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px;
+      box-shadow:0 10px 30px rgba(0,0,0,.12);z-index:40}
+    .header-more.open .more-menu{display:flex}
+    #moreBtn{display:inline-flex}
   }
 </style>
 </head>
@@ -205,8 +229,13 @@
   <span class="who" id="whoAmI"></span>
   <button class="btn" id="archiveBtn">📚 存档</button>
   <button class="btn" id="inviteBtn" style="display:none">🎟 邀请码</button>
-  <button class="btn" id="helpBtn">说明</button>
-  <button class="btn" id="logoutBtn">退出</button>
+  <div class="header-more">
+    <button class="btn icon" id="moreBtn" aria-label="更多">⋯</button>
+    <div class="more-menu" id="moreMenu">
+      <button class="btn" id="helpBtn">说明</button>
+      <button class="btn" id="logoutBtn">退出</button>
+    </div>
+  </div>
 </header>
 
 <div id="mainWrap" style="display:none">
@@ -360,9 +389,17 @@ function td(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMont
 function scrollBottom(){ chatEl.scrollTop = chatEl.scrollHeight; }
 function addMsg(role, text, typing=false, imageHtml=""){
   const d=document.createElement("div");
-  d.className="msg "+role+(typing?" typing":"");
-  d.innerHTML=`<span class="who">${role==='rosebud'?'省身':'你'}</span>`+imageHtml+esc(text);
-  chatEl.appendChild(d); scrollBottom(); return d;
+  d.className="msg "+role;
+  const av = role==='rosebud' ? "🌿" : "🐱";
+  const b=document.createElement("div");
+  b.className="bubble"+(typing?" typing":"");
+  b.innerHTML = typing
+    ? '<span class="who">省身</span><span class="typing-dots"><span></span><span></span><span></span></span>'
+    : `<span class="who">${role==='rosebud'?'省身':'你'}</span>`+imageHtml+esc(text);
+  d.innerHTML=`<div class="avatar">${av}</div>`;
+  d.appendChild(b);
+  chatEl.appendChild(d); scrollBottom();
+  return b;
 }
 function downloadBlob(blob, name){
   const a=document.createElement("a");
@@ -819,7 +856,11 @@ function bindEvents(){
   bind("logoutBtn", logout);
   bindAll(".mode", el=>startMode(el.dataset.mode));
   bind("sendBtn", ()=>{ const v=$("#input").value; if(v.trim()){ $("#input").value=""; sendUser(v);} });
-  const inp = document.getElementById("input"); if(inp) inp.addEventListener("keydown",e=>{ if((e.metaKey||e.ctrlKey)&&e.key==="Enter"){ const v=$("#input").value; if(v.trim()){ $("#input").value=""; sendUser(v);} }});
+  const inp = document.getElementById("input");
+  if(inp){
+    inp.addEventListener("keydown",e=>{ if((e.metaKey||e.ctrlKey)&&e.key==="Enter"){ const v=$("#input").value; if(v.trim()){ $("#input").value=""; sendUser(v);} }});
+    inp.addEventListener("focus", ()=> setTimeout(()=>{ try{ inp.scrollIntoView({block:"nearest",behavior:"smooth"}); }catch(e){} }, 300));
+  }
   bindAll(".chip", (el)=>quickAction(el.dataset.act));
   bind("genBtn", generate);
   bind("archiveBtn", ()=>{ $("#archiveMask").classList.add("show"); loadEntries(); });
@@ -848,6 +889,14 @@ function bindEvents(){
     mp.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); openMenu(); } });
   }
   document.addEventListener("click", e=>{ if(!e.target.closest("#modelMenu") && !e.target.closest("#modelPill")) closeModelMenu(); });
+  // 移动端「⋯」更多菜单：说明 / 退出
+  const hm = document.querySelector(".header-more");
+  if(hm){
+    const moreBtn = document.getElementById("moreBtn");
+    if(moreBtn) moreBtn.addEventListener("click", e=>{ e.stopPropagation(); hm.classList.toggle("open"); });
+    document.addEventListener("click", e=>{ if(!e.target.closest(".header-more")) hm.classList.remove("open"); });
+    hm.querySelectorAll(".more-menu .btn").forEach(b=>b.addEventListener("click", ()=>hm.classList.remove("open")));
+  }
   bindAll("[data-close]", el=>$("#"+el.dataset.close).classList.remove("show"));
   bindAll(".mask", (m,e)=>{ if(e.target===m) m.classList.remove("show"); });
 }
