@@ -42,16 +42,22 @@ Deno.serve(async (req) => {
   if (prof.error || !prof.data?.is_admin) return json({ error: "需要管理员权限" }, 403);
 
   if (req.method === "GET") {
-    const { data, error } = await supabase
+    const { data: inv, error } = await supabase
       .from("invites")
-      .select("code, created_at, used_at, profiles(email)")
+      .select("code, created_at, used_at, used_by")
       .order("created_at", { ascending: false });
     if (error) return json({ error: error.message }, 500);
-    const invites = (data || []).map((r) => ({
+    const usedIds = (inv || []).map((r) => r.used_by).filter(Boolean);
+    let profileMap = {};
+    if (usedIds.length) {
+      const { data: profs } = await supabase.from("profiles").select("id,email").in("id", usedIds);
+      (profs || []).forEach((p) => (profileMap[p.id] = p.email));
+    }
+    const invites = (inv || []).map((r) => ({
       code: r.code,
       created_at: r.created_at,
       used_at: r.used_at,
-      used_by: r.used_at ? (r.profiles?.email ?? "已使用") : null,
+      used_by: r.used_by ? (profileMap[r.used_by] || "已使用") : null,
     }));
     return json({ invites });
   }
