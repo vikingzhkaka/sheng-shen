@@ -75,7 +75,7 @@ GitHub 仓库 → Settings → Pages → 部署分支 `main`、路径 `/`（本�
 | Edge Functions | 50 万次调用/月 |
 | GitHub Pages | 无限静态托管 |
 
-## 导出格式（Obsidian 可直接打开）
+## 导出格式（纯 markdown）
 
 每天一个文件 `YYYY-MM-DD.md`，带 YAML frontmatter，含当日全部条目：
 
@@ -100,7 +100,7 @@ tags: [复盘日记]
 ...
 
 #### Entry
-**viking:** ...
+**你:** ...
 ```
 
 ## 安全设计
@@ -113,6 +113,12 @@ tags: [复盘日记]
 | 数据隔离 | Postgres RLS：`auth.uid() = user_id`，跨用户读写被数据库层拒绝 |
 | 邀请码 | 表对客户端不可见；校验/标记在 Edge Function（service role）内原子完成 |
 | 权限 | 生成/查看邀请码仅管理员；AI 对话必须带有效登录态 |
+
+## 隐私说明
+
+- 本仓库**不含任何用户日记内容**：所有复盘数据只存在你自己的 Supabase 项目里，按 `user_id` 行级隔离，不会进 git 仓库。
+- `supabase-config.js` 里的 anon key 是 Supabase 的**公开（publishable）key**，按官方设计就放在前端浏览器中；它的安全性由 RLS 行级权限保证，而非靠保密。它**不等于** service_role key，拿不到他人数据，可以安全公开。
+- 想把它当纯模板、不在仓库里放你真实的项目凭据：把 `supabase-config.js` 改名 `supabase-config.example.js` 并填入占位符，再把真实的加到 `.gitignore`；本地/部署时再补回。注意：GitHub Pages 直接服务仓库文件，若仓库里没有真实 `supabase-config.js`，线上 demo 会连不上，需要额外在部署环节注入配置。
 
 ## 本地开发
 
