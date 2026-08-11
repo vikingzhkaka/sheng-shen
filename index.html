@@ -163,6 +163,10 @@
 </head>
 <body>
 
+<!-- 启动诊断条：详细报告每一步状态 -->
+<div id="bootTrace" style="display:none"></div>
+<button id="bootTraceToggle" onclick="document.getElementById('bootTrace').classList.toggle('show')">📋 诊断</button>
+
 <!-- 登录 / 注册 -->
 <div class="authmask show" id="authMask">
   <div class="authcard">
@@ -705,24 +709,89 @@ function bindEvents(){
   document.querySelectorAll(".mask").forEach(m=>m.onclick=e=>{ if(e.target===m) m.classList.remove("show"); });
 }
 async function boot(){
-  bindEvents();
-  if(!CFG){
-    $("#authSub").innerHTML = "⚠️ 尚未配置后端（supabase-config.js 为空）。部署步骤见 README。";
+  const t = $("#bootTrace");
+  const show = () => { t.classList.add("show"); };
+  const log = (ok, msg) => {
+    const line = document.createElement("div");
+    line.innerHTML = `<span class="step">${ok===true?'✓':(ok===false?'✗':'·')}</span>${msg}`;
+    t.appendChild(line);
+  };
+  // First show: maybe user wants to see this
+  show();
+  log(null, "boot() 开始 · " + new Date().toLocaleTimeString());
+
+  // Step 0: CFG
+  log(typeof CFG !== "undefined" && CFG && CFG.url, "CFG: " + (typeof CFG !== "undefined" ? (CFG ? "url="+CFG.url.slice(0,40)+"…" : "空对象") : "未定义"));
+  if(typeof CFG === "undefined" || !CFG || !CFG.url){
+    t.classList.add("err");
+    log(false, "→ 缺 supabase-config.js 或 url 字段为空。重新部署。");
+    $("#authSub").innerHTML = "⚠️ 后端未配置（supabase-config.js 缺 CFG.url）。";
     showAuth(); return;
   }
-  if(typeof supabase === "undefined" || !supabase.createClient){
-    $("#authSub").innerHTML = "⚠️ Supabase SDK 加载失败（可能被网络拦截）。请检查网络后刷新。";
-    showAuth(); return;
+
+  // Step 1: supabase global
+  try{ bindEvents(); log(true, "bindEvents 已挂载 ✓"); }
+  catch(e){ t.classList.add("err"); log(false, "bindEvents 抛错: " + e.message); showAuth(); return; }
+  const supBaseOk = typeof supabase !== "undefined";
+  log(supBaseOk, "supabase 全局变量: " + (supBaseOk ? "已挂载 ✓" : "未定义 ✗"));
+
+  if(!supBaseOk){
+    log(null, "→ 主动探测 vendor/supabase.min.js（看是你的网还是 CDN 缓存）");
+    try {
+      const r = await fetch("vendor/supabase.min.js?_t="+Date.now(), {cache:"no-store"});
+      const txt = await r.text();
+      log(r.ok, `  fetch ${r.status} · ${txt.length} bytes · 头 60 字节: ${txt.slice(0,60).replace(/\n/g,'⏎')}`);
+      if(r.ok){
+        // Evaluate manually
+        log(null, "→ fetch 拿到了，但页面加载时 supabase 居然没挂上。手动执行一次再赋值：");
+        try {
+          const s = document.createElement("script");
+          s.textContent = txt;
+          document.head.appendChild(s);
+          log(typeof supabase !== "undefined" && typeof supabase.createClient === "function", "  手动执行后 supabase: " + (typeof supabase !== "undefined" ? "已挂载" : "仍然未挂载"));
+        }catch(ev){ log(false, "  手动执行抛错: " + ev.message); }
+      }
+    } catch(ev){
+      log(false, "  fetch vendor/supabase.min.js 失败: " + ev.message + " — 多半是网络拦截。");
+    }
+
+    if(typeof supabase === "undefined" || typeof supabase.createClient !== "function"){
+      t.classList.add("err");
+      $("#authSub").innerHTML = "⚠️ Supabase SDK 加载失败 — 见下方诊断条";
+      showAuth(); return;
+    }
+  } else {
+    const ccOk = typeof supabase.createClient === "function";
+    log(ccOk, "supabase.createClient: " + (ccOk ? "是函数 ✓" : "不是函数 ✗"));
+    if(!ccOk){ t.classList.add("err"); showAuth(); return; }
   }
+
+  // Step 2: createClient
   try{
     sb = supabase.createClient(CFG.url, CFG.anon);
+    log(true, "sb = supabase.createClient 已就绪 ✓");
   }catch(e){
-    $("#authSub").innerHTML = "⚠️ Supabase 客户端初始化失败：" + e.message;
+    t.classList.add("err");
+    log(false, "createClient 抛错: " + e.message);
+    $("#authSub").innerHTML = "⚠️ Supabase 客户端初始化失败: " + e.message;
     showAuth(); return;
   }
-  const { data } = await sb.auth.getSession();
-  if(data && data.session){ useSession(data.session); hideAuth(); bootAfterAuth(); }
-  else { showAuth(); }
+
+  // Step 3: session
+  try{
+    const { data } = await sb.auth.getSession();
+    if(data && data.session){
+      log(true, "已有会话（refreshMe 即将填资料）");
+      useSession(data.session); hideAuth(); bootAfterAuth();
+    } else {
+      log(true, "无会话 → 弹出登录框");
+      showAuth();
+    }
+  }catch(e){
+    t.classList.add("err");
+    log(false, "getSession 抛错: " + e.message);
+    showAuth();
+  }
   sb.auth.onAuthStateChange((ev, sess)=>{
     if(ev==="SIGNED_OUT"){ email=""; uid=""; accessToken=""; showAuth(); }
   });
