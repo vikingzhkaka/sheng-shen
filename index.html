@@ -748,9 +748,13 @@ async function fnHeaders(){
 async function loadInvites(){
   const box=$("#inviteList"); box.innerHTML='<div class="empty">加载中…</div>';
   try{
-    const { data, error } = await sb.functions.invoke("invites", { method:"GET" });
-    if(error) throw error;
-    const iv = data?.invites || [];
+    const headers = await fnHeaders();
+    // sb.functions.invoke 走 .functions.supabase.co 子域名——我们的项目不存在这个 DNS！
+    // 必须用 apikey 项目根域名的 /functions/v1/ 路径（已验证可达）
+    const r = await fetch(CFG.url.replace(/\/$/,"")+"/functions/v1/invites", {headers});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error || ("加载失败 HTTP "+r.status));
+    const iv = j.invites || [];
     if(!iv.length){ box.innerHTML='<div class="empty">还没有生成过邀请码。</div>'; return; }
     box.innerHTML="";
     iv.forEach(i=>{
@@ -762,23 +766,18 @@ async function loadInvites(){
       box.appendChild(row);
     });
   }catch(e){
-    // 若 session 真的过期，强制重新登录
-    const msg = (e.message||String(e)).toLowerCase();
-    if(msg.includes("401") || msg.includes("未登录") || msg.includes("jwt") || msg.includes("auth")){
-      console.warn("[loadInvites] 会话失效，强制重新登录:", e.message);
-      box.innerHTML='<div class="empty" style="color:var(--muted)">会话已过期，请点"退出"重新登录。</div>';
-      // 不立刻 redirect — 让用户看到提示，自己点退出
-    } else {
-      box.innerHTML='<div class="empty">加载失败：'+esc(e.message||String(e))+'</div>';
-    }
+    box.innerHTML='<div class="empty">加载失败：'+esc(e.message||String(e))+'</div>';
   }
 }
 async function genInvite(){
   try{
-    const { data, error } = await sb.functions.invoke("invites", { method:"POST", body:{ count:1 } });
-    if(error) throw error;
-    if(data?.codes && data.codes.length){
-      alert("新邀请码："+data.codes[0]+"\n\n发给想用的人，凭它注册。");
+    const headers = await fnHeaders();
+    const r = await fetch(CFG.url.replace(/\/$/,"")+"/functions/v1/invites",
+      {method:"POST", headers, body: JSON.stringify({count:1})});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error || ("生成失败 HTTP "+r.status));
+    if(j.codes && j.codes.length){
+      alert("新邀请码："+j.codes[0]+"\n\n发给想用的人，凭它注册。");
     } else { alert("生成失败：返回为空"); }
   }catch(e){ alert("生成失败："+(e.message||String(e))); }
   loadInvites();
