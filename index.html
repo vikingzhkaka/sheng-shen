@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>省身 · 每日三省</title>
 <link rel="icon" type="image/svg+xml" href="logo-mark.svg" />
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="vendor/supabase.min.js"></script>
+<script src="vendor/jszip.min.js"></script>
 <script src="supabase-config.js"></script>
 <style>
   :root{
@@ -384,7 +384,8 @@ function hideAuth(){
   refreshMe();
 }
 async function doLogin(){
-  if(!CFG){ return; }
+  if(!CFG){ $("#liErr").textContent="后端未配置 (supabase-config.js)"; $("#liErr").style.display="block"; return; }
+  if(!sb){ $("#liErr").textContent="Supabase SDK 未初始化（页面没加载完整或被网络拦截），请刷新页面重试"; $("#liErr").style.display="block"; return; }
   const em=$("#liEmail").value.trim(), pw=$("#liPass").value;
   $("#liErr").style.display="none";
   try{
@@ -395,7 +396,8 @@ async function doLogin(){
   }catch(e){ $("#liErr").textContent=e.message; $("#liErr").style.display="block"; }
 }
 async function doRegister(){
-  if(!CFG){ return; }
+  if(!CFG){ $("#rgErr").textContent="后端未配置 (supabase-config.js)"; $("#rgErr").style.display="block"; return; }
+  if(!sb){ $("#rgErr").textContent="Supabase SDK 未初始化，请刷新页面重试"; $("#rgErr").style.display="block"; return; }
   const em=$("#rgEmail").value.trim(), pw=$("#rgPass").value, inv=$("#rgInvite").value.trim();
   $("#rgErr").style.display="none";
   try{
@@ -708,7 +710,16 @@ async function boot(){
     $("#authSub").innerHTML = "⚠️ 尚未配置后端（supabase-config.js 为空）。部署步骤见 README。";
     showAuth(); return;
   }
-  sb = supabase.createClient(CFG.url, CFG.anon);
+  if(typeof supabase === "undefined" || !supabase.createClient){
+    $("#authSub").innerHTML = "⚠️ Supabase SDK 加载失败（可能被网络拦截）。请检查网络后刷新。";
+    showAuth(); return;
+  }
+  try{
+    sb = supabase.createClient(CFG.url, CFG.anon);
+  }catch(e){
+    $("#authSub").innerHTML = "⚠️ Supabase 客户端初始化失败：" + e.message;
+    showAuth(); return;
+  }
   const { data } = await sb.auth.getSession();
   if(data && data.session){ useSession(data.session); hideAuth(); bootAfterAuth(); }
   else { showAuth(); }
