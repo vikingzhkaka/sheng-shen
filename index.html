@@ -190,6 +190,9 @@
       <img src="logo-mark.svg" alt="" />
       <span class="bn">省身</span>
     </div>
+
+    <!-- 启动状态卡：登录框顶部永远显示 -->
+    <div id="bootStatus" style="background:#1a1a1a;color:#7CFFB2;border-radius:8px;padding:10px 12px;margin:14px 0;font:12px ui-monospace,Menlo,Consolas,monospace;line-height:1.7;border:1px solid #333">⏳ 启动中…</div>
     <div class="sub" id="authSub">每日三省 · 照见自己 · 数据只属于你的账户</div>
     <div class="tabs">
       <div class="tab active" id="tabLogin">登录</div>
@@ -726,11 +729,18 @@ function bindEvents(){
 }
 async function boot(){
   const t = $("#bootTrace");
-  const show = () => { t.classList.add("show"); };
+  const s = $("#bootStatus");
+  const show = () => { t.classList.add("show"); s.style.display="block"; };
+  const sym = ok => ok===true?'✓':(ok===false?'✗':'·');
   const log = (ok, msg) => {
     const line = document.createElement("div");
-    line.innerHTML = `<span class="step">${ok===true?'✓':(ok===false?'✗':'·')}</span>${msg}`;
+    line.innerHTML = `<span class="step">${sym(ok)}</span>${msg}`;
     t.appendChild(line);
+    if(s){
+      const l2 = document.createElement("div");
+      l2.innerHTML = `${sym(ok)} ${msg}`;
+      s.appendChild(l2);
+    }
   };
   // First show: maybe user wants to see this
   document.body.classList.add("hasTrace");
@@ -738,17 +748,21 @@ async function boot(){
   log(null, "boot() 开始 · " + new Date().toLocaleTimeString());
 
   // Step 0: CFG
-  log(typeof CFG !== "undefined" && CFG && CFG.url, "CFG: " + (typeof CFG !== "undefined" ? (CFG ? "url="+CFG.url.slice(0,40)+"…" : "空对象") : "未定义"));
-  if(typeof CFG === "undefined" || !CFG || !CFG.url){
-    t.classList.add("err");
-    log(false, "→ 缺 supabase-config.js 或 url 字段为空。重新部署。");
-    $("#authSub").innerHTML = "⚠️ 后端未配置（supabase-config.js 缺 CFG.url）。";
-    showAuth(); return;
-  }
+  try {
+    log(typeof CFG !== "undefined" && CFG && CFG.url, "CFG: " + (typeof CFG !== "undefined" ? (CFG ? "url="+CFG.url.slice(0,40)+"…" : "空对象") : "未定义"));
+    if(typeof CFG === "undefined" || !CFG || !CFG.url){
+      t.classList.add("err"); s.style.background="#3a1a1a"; s.style.borderColor="#c33";
+      log(false, "→ 缺 supabase-config.js 或 url 字段为空。");
+      $("#authSub").innerHTML = "⚠️ 后端未配置（supabase-config.js 缺 CFG.url）。";
+      showAuth(); return;
+    }
+  } catch(e){ log(false, "CFG 步骤抛错: " + e.message); showAuth(); return; }
 
   // Step 1: supabase global
-  try{ bindEvents(); log(true, "bindEvents 已挂载 ✓"); }
-  catch(e){ t.classList.add("err"); log(false, "bindEvents 抛错: " + e.message); showAuth(); return; }
+  try {
+    bindEvents(); log(true, "bindEvents 已挂载 ✓");
+  } catch(e){ t.classList.add("err"); log(false, "bindEvents 抛错: " + e.message); showAuth(); return; }
+
   const supBaseOk = typeof supabase !== "undefined";
   log(supBaseOk, "supabase 全局变量: " + (supBaseOk ? "已挂载 ✓" : "未定义 ✗"));
 
@@ -759,12 +773,11 @@ async function boot(){
       const txt = await r.text();
       log(r.ok, `  fetch ${r.status} · ${txt.length} bytes · 头 60 字节: ${txt.slice(0,60).replace(/\n/g,'⏎')}`);
       if(r.ok){
-        // Evaluate manually
         log(null, "→ fetch 拿到了，但页面加载时 supabase 居然没挂上。手动执行一次再赋值：");
         try {
-          const s = document.createElement("script");
-          s.textContent = txt;
-          document.head.appendChild(s);
+          const se = document.createElement("script");
+          se.textContent = txt;
+          document.head.appendChild(se);
           log(typeof supabase !== "undefined" && typeof supabase.createClient === "function", "  手动执行后 supabase: " + (typeof supabase !== "undefined" ? "已挂载" : "仍然未挂载"));
         }catch(ev){ log(false, "  手动执行抛错: " + ev.message); }
       }
@@ -773,8 +786,8 @@ async function boot(){
     }
 
     if(typeof supabase === "undefined" || typeof supabase.createClient !== "function"){
-      t.classList.add("err");
-      $("#authSub").innerHTML = "⚠️ Supabase SDK 加载失败 — 见下方诊断条";
+      t.classList.add("err"); s.style.background="#3a1a1a"; s.style.borderColor="#c33";
+      $("#authSub").innerHTML = "⚠️ Supabase SDK 加载失败 — 见上方启动卡";
       showAuth(); return;
     }
   } else {
@@ -788,7 +801,7 @@ async function boot(){
     sb = supabase.createClient(CFG.url, CFG.anon);
     log(true, "sb = supabase.createClient 已就绪 ✓");
   }catch(e){
-    t.classList.add("err");
+    t.classList.add("err"); s.style.background="#3a1a1a"; s.style.borderColor="#c33";
     log(false, "createClient 抛错: " + e.message);
     $("#authSub").innerHTML = "⚠️ Supabase 客户端初始化失败: " + e.message;
     showAuth(); return;
@@ -802,10 +815,12 @@ async function boot(){
       useSession(data.session); hideAuth(); bootAfterAuth();
     } else {
       log(true, "无会话 → 弹出登录框");
+      // Hide the diagnostic card now that we're ready
+      s.style.display = "none";
       showAuth();
     }
   }catch(e){
-    t.classList.add("err");
+    t.classList.add("err"); s.style.background="#3a1a1a"; s.style.borderColor="#c33";
     log(false, "getSession 抛错: " + e.message);
     showAuth();
   }
