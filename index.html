@@ -254,6 +254,7 @@
         <div class="model-menu" id="modelMenu"></div>
       </div>
       <div class="spacer"></div>
+      <button class="btn" id="genBtn">🌿 生成复盘</button>
       <button class="btn primary" id="sendBtn">发送</button>
     </div>
   </div>
@@ -697,35 +698,52 @@ async function bootAfterAuth(){
   startMode("evening");
 }
 function bindEvents(){
-  $("#tabLogin").onclick=()=>{ $("#tabLogin").classList.add("active"); $("#tabRegister").classList.remove("active");
-    $("#loginForm").style.display="block"; $("#regForm").style.display="none"; };
-  $("#tabRegister").onclick=()=>{ $("#tabRegister").classList.add("active"); $("#tabLogin").classList.remove("active");
-    $("#loginForm").style.display="none"; $("#regForm").style.display="block"; };
-  $("#liBtn").onclick=doLogin;
-  $("#liPass").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
-  $("#rgBtn").onclick=doRegister;
-  $("#rgInvite").addEventListener("keydown",e=>{ if(e.key==="Enter") doRegister(); });
-  $("#logoutBtn").onclick=logout;
-  document.querySelectorAll(".mode").forEach(el=>el.onclick=()=>startMode(el.dataset.mode));
-  $("#sendBtn").onclick=()=>{ const v=$("#input").value; if(v.trim()){ $("#input").value=""; sendUser(v);} };
-  $("#input").addEventListener("keydown",e=>{ if((e.metaKey||e.ctrlKey)&&e.key==="Enter"){ const v=$("#input").value; if(v.trim()){ $("#input").value=""; sendUser(v);} }});
-  document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>quickAction(c.dataset.act));
-  $("#genBtn").onclick=generate;
-  $("#archiveBtn").onclick=()=>{ $("#archiveMask").classList.add("show"); loadEntries(); };
-  $("#closeArchive").onclick=()=>$("#archiveMask").classList.remove("show");
-  $("#expRangeBtn").onclick=exportRange;
-  $("#inviteBtn").onclick=()=>{ $("#inviteMask").classList.add("show"); loadInvites(); };
-  $("#genInviteBtn").onclick=genInvite;
-  $("#helpBtn").onclick=()=>$("#helpMask").classList.add("show");
-  $("#copyBtn").onclick=()=>{ navigator.clipboard.writeText($("#previewText").textContent); $("#copyBtn").textContent="已复制✓"; setTimeout(()=>$("#copyBtn").textContent="复制全文",1500); };
-  $("#previewExport").onclick=async()=>{ if(lastDay){ try{ await exportDay(lastDay); }catch(e){ alert(e.message); } } };
+  // 每个绑定独立 try/catch，缺失元素能精确定位
+  const bind = (id, fn, ev="onclick") => {
+    const el = document.getElementById(id);
+    if(!el){ console.warn("[bindEvents] missing id:", id); return; }
+    el[ev] = fn;
+  };
+  const bindAll = (sel, fn, ev="onclick") => {
+    const els = document.querySelectorAll(sel);
+    if(!els.length){ console.warn("[bindEvents] missing selector:", sel); return; }
+    els.forEach(el => el[ev] = fn);
+  };
+
+  bind("tabLogin", ()=>{ $("#tabLogin").classList.add("active"); $("#tabRegister").classList.remove("active");
+    $("#loginForm").style.display="block"; $("#regForm").style.display="none"; });
+  bind("tabRegister", ()=>{ $("#tabRegister").classList.add("active"); $("#tabLogin").classList.remove("active");
+    $("#loginForm").style.display="none"; $("#regForm").style.display="block"; });
+  bind("liBtn", doLogin);
+  bind("liPass", e=>{ if(e.key==="Enter") doLogin(); }, "addEventListener_keydown_unused");
+  // keydown 通过 addEventListener 单独处理（保留兼容写法）
+  const lp = document.getElementById("liPass"); if(lp) lp.addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
+  bind("rgBtn", doRegister);
+  const ri = document.getElementById("rgInvite"); if(ri) ri.addEventListener("keydown",e=>{ if(e.key==="Enter") doRegister(); });
+  bind("logoutBtn", logout);
+  bindAll(".mode", el=>startMode(el.dataset.mode));
+  bind("sendBtn", ()=>{ const v=$("#input").value; if(v.trim()){ $("#input").value=""; sendUser(v);} });
+  const inp = document.getElementById("input"); if(inp) inp.addEventListener("keydown",e=>{ if((e.metaKey||e.ctrlKey)&&e.key==="Enter"){ const v=$("#input").value; if(v.trim()){ $("#input").value=""; sendUser(v);} }});
+  bindAll(".chip", c=>quickAction(c.dataset.act));
+  bind("genBtn", generate);
+  bind("archiveBtn", ()=>{ $("#archiveMask").classList.add("show"); loadEntries(); });
+  bind("closeArchive", ()=>$("#archiveMask").classList.remove("show"));
+  bind("expRangeBtn", exportRange);
+  bind("inviteBtn", ()=>{ $("#inviteMask").classList.add("show"); loadInvites(); });
+  bind("genInviteBtn", genInvite);
+  bind("helpBtn", ()=>$("#helpMask").classList.add("show"));
+  bind("copyBtn", ()=>{ navigator.clipboard.writeText($("#previewText").textContent); $("#copyBtn").textContent="已复制✓"; setTimeout(()=>$("#copyBtn").textContent="复制全文",1500); });
+  bind("previewExport", async()=>{ if(lastDay){ try{ await exportDay(lastDay); }catch(e){ alert(e.message); } } });
   // 模型选择：点击/键盘打开菜单，外部点击关闭
   const openMenu=()=>{ renderModelMenu(); toggleModelMenu(); };
-  $("#modelPill").addEventListener("click", e=>{ e.stopPropagation(); openMenu(); });
-  $("#modelPill").addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); openMenu(); } });
+  const mp = document.getElementById("modelPill");
+  if(mp){
+    mp.addEventListener("click", e=>{ e.stopPropagation(); openMenu(); });
+    mp.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); openMenu(); } });
+  }
   document.addEventListener("click", e=>{ if(!e.target.closest("#modelMenu") && !e.target.closest("#modelPill")) closeModelMenu(); });
-  document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$("#"+b.dataset.close).classList.remove("show"));
-  document.querySelectorAll(".mask").forEach(m=>m.onclick=e=>{ if(e.target===m) m.classList.remove("show"); });
+  bindAll("[data-close]", b=>$("#"+b.dataset.close).classList.remove("show"));
+  bindAll(".mask", m=>{ if(m.target===m) m.classList.remove("show"); });
 }
 async function boot(){
   const t = $("#bootTrace");
