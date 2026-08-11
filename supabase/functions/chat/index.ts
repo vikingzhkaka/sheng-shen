@@ -18,8 +18,8 @@ function json(obj, status = 200) {
 }
 
 const MODELS = [
-  { id: "deepseek-v4-flash", base: "https://token.sensenova.cn/v1", primary: true },
-  { id: "sensenova-6.7-flash-lite", base: "https://token.sensenova.cn/v1" },
+  { id: "deepseek-v4-flash", base: "https://token.sensenova.cn/v1", primary: true, multimodal: false },
+  { id: "sensenova-6.7-flash-lite", base: "https://token.sensenova.cn/v1", multimodal: true },
 ];
 
 Deno.serve(async (req) => {
@@ -45,7 +45,18 @@ Deno.serve(async (req) => {
   const key = Deno.env.get("SENSENOVA_API_KEY");
   if (!key) return json({ error: "服务端未配置 SENSENOVA_API_KEY" }, 500);
 
-  const m = MODELS.find((x) => x.id === body.model) ?? MODELS.find((x) => x.primary)!;
+  // 若消息含图片，强制使用多模态模型
+  const hasImage = messages.some((mm)=>{
+    const c = mm && mm.content;
+    if(Array.isArray(c)) return c.some(p=>p && p.type==="image_url");
+    return false;
+  });
+  let m;
+  if(hasImage){
+    m = MODELS.find(x=>x.multimodal) || MODELS.find(x=>x.primary)!;
+  } else {
+    m = MODELS.find(x => x.id === body.model) ?? MODELS.find(x => x.primary)!;
+  }
   try {
     const resp = await fetch(m.base + "/chat/completions", {
       method: "POST",

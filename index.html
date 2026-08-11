@@ -33,6 +33,7 @@
   .btn.primary:hover{filter:brightness(1.05)}
   .btn:disabled{opacity:.45;cursor:not-allowed}
   .btn.small{padding:4px 9px;font-size:12px;border-radius:8px}
+  .btn.icon{padding:6px 10px;font-size:16px;line-height:1}
 
   #mainWrap{flex:1;display:flex;flex-direction:column;min-height:0}
   .modes{display:flex;gap:8px;padding:12px 20px 0;flex-wrap:wrap}
@@ -227,8 +228,8 @@
 
 <div id="mainWrap" style="display:none">
   <div class="modes" id="modes">
-    <div class="mode" data-mode="morning">🌅 晨间规划</div>
-    <div class="mode active" data-mode="evening">🌙 晚间复盘</div>
+    <div class="mode active" data-mode="morning">🌅 晨间规划</div>
+    <div class="mode" data-mode="evening">🌙 晚间复盘</div>
     <div class="mode" data-mode="free">💭 自由对话</div>
   </div>
 
@@ -244,6 +245,16 @@
 
   <div class="compose">
     <textarea id="input" placeholder="写点什么…（⌘/Ctrl+Enter 发送）"></textarea>
+    <div id="attachPreview" style="display:none;margin:6px 0;padding:8px 10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;font-size:12.5px">
+      <div style="display:flex;gap:10px;align-items:center">
+        <img id="attachThumb" style="width:54px;height:54px;object-fit:cover;border-radius:8px;background:#eee" />
+        <div style="flex:1;min-width:0">
+          <div id="attachName" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+          <div id="attachSize" style="color:var(--muted);font-size:11.5px"></div>
+        </div>
+        <button class="btn" id="attachRemove" type="button">移除</button>
+      </div>
+    </div>
     <div class="compose-bar">
       <div class="model-wrap">
         <div class="model-pill" id="modelPill" role="button" tabindex="0">
@@ -253,6 +264,8 @@
         </div>
         <div class="model-menu" id="modelMenu"></div>
       </div>
+      <button class="btn icon" id="attachBtn" title="附图（仅 6.7 多模态支持）" type="button">📎</button>
+      <input type="file" id="fileInput" accept="image/*" style="display:none" />
       <div class="spacer"></div>
       <button class="btn" id="genBtn">🌿 生成复盘</button>
       <button class="btn primary" id="sendBtn">发送</button>
@@ -328,14 +341,14 @@ const CFG = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) ? window.SUPA
 
 // 模型：name/desc 是输入框胶囊显示的精简描述（不带"主/辅"）
 const MODELS = [
-  { model:"deepseek-v4-flash",          name:"V4",   desc:"快速文字" },
-  { model:"sensenova-6.7-flash-lite",   name:"6.7", desc:"看图" },
+  { model:"deepseek-v4-flash",          name:"V4",   desc:"快速文字", multimodal:false },
+  { model:"sensenova-6.7-flash-lite",   name:"6.7",  desc:"看图",     multimodal:true  },
 ];
 
 /* ---------- 状态 ---------- */
 let sb = null;
 let activeModel = MODELS[0].model;
-let mode = "evening";
+let mode = "morning";
 let messages = [];
 let queue = [];
 let phase = "scripted";
@@ -361,16 +374,47 @@ const OPENERS = {
 function esc(s){ return s.replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 function td(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
 function scrollBottom(){ chatEl.scrollTop = chatEl.scrollHeight; }
-function addMsg(role, text, typing=false){
+function addMsg(role, text, typing=false, imageHtml=""){
   const d=document.createElement("div");
   d.className="msg "+role+(typing?" typing":"");
-  d.innerHTML=`<span class="who">${role==='rosebud'?'省身':'你'}</span>`+esc(text);
+  d.innerHTML=`<span class="who">${role==='rosebud'?'省身':'你'}</span>`+imageHtml+esc(text);
   chatEl.appendChild(d); scrollBottom(); return d;
 }
 function downloadBlob(blob, name){
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob); a.download=name; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+}
+
+/* ---------- 图片附件（仅多模态模型生效） ---------- */
+let attachedFile = null;     // {name, type, dataUrl, size}
+async function handleAttach(file){
+  if(!file.type.startsWith("image/")){ alert("仅支持图片文件"); return; }
+  if(file.size > 8*1024*1024){ alert("图片不能超过 8MB"); return; }
+  const dataUrl = await new Promise((res, rej)=>{
+    const r = new FileReader();
+    r.onload = ()=>res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+  attachedFile = { name: file.name, type: file.type, dataUrl, size: file.size };
+  $("#attachThumb").src = dataUrl;
+  $("#attachName").textContent = file.name;
+  $("#attachSize").textContent = (file.size/1024).toFixed(0)+" KB";
+  $("#attachPreview").style.display = "";
+  // 切到多模态模型
+  const mm = MODELS.find(m=>m.multimodal);
+  if(mm && activeModel !== mm.model){
+    activeModel = mm.model;
+    refreshModelPill();
+    renderModelMenu();
+    addMsg("rosebud", `🔁 已切换到「${mm.name} · ${mm.desc}」来处理这张图片`);
+  }
+}
+function clearAttach(){
+  attachedFile = null;
+  $("#attachPreview").style.display = "none";
+  $("#attachThumb").src = "";
 }
 
 /* ---------- 模型选择（输入框内的胶囊 + 自定义菜单） ---------- */
@@ -455,10 +499,14 @@ async function logout(){
 async function apiCall(apiMessages){
   const body = {messages: apiMessages};
   if(activeModel) body.model = activeModel;
+  const headers = {"Content-Type":"application/json"};
+  // 拿 fresh JWT
+  try{
+    const { data } = await sb.auth.getSession();
+    if(data.session?.access_token){ headers.Authorization = "Bearer "+data.session.access_token; accessToken = data.session.access_token; }
+  }catch{}
   const r = await fetch(CFG.url.replace(/\/$/,"")+"/functions/v1/chat",
-    {method:"POST",
-     headers:{"Content-Type":"application/json","Authorization":"Bearer "+accessToken},
-     body: JSON.stringify(body)});
+    {method:"POST", headers, body: JSON.stringify(body)});
   const j = await r.json();
   if(!r.ok) throw new Error(j.error || ("对话失败 " + r.status));
   return j.content;
@@ -476,7 +524,18 @@ function persona(){
 - 这是私人工具，所有内容只属于用户本人，不要建议把内容发给任何人。
 当前模式：${modeName}。`;
 }
-function toApi(){ return messages.map(m=>({role:m.role==='rosebud'?'assistant':'user', content:m.text})); }
+function toApi(){
+  return messages.map(m=>{
+    const role = m.role==='rosebud'?'assistant':'user';
+    if(m.image){
+      return { role, content: [
+        {type:"text", text: m.text || ""},
+        {type:"image_url", image_url:{url: m.image}}
+      ]};
+    }
+    return { role, content: m.text };
+  });
+}
 
 function startMode(m){
   mode=m; messages=[]; chatEl.innerHTML="";
@@ -490,8 +549,13 @@ function setChipsEnabled(on){ document.querySelectorAll(".chip").forEach(c=>c.di
 async function sendUser(text){
   if(busy || !text.trim()) return;
   busy=true; setChipsEnabled(false); $("#sendBtn").disabled=true;
-  addMsg("viking", text.trim());
-  messages.push({role:"viking", text:text.trim()});
+  // 图片展示
+  const imgHtml = attachedFile ? `<img src="${esc(attachedFile.dataUrl)}" style="max-width:200px;max-height:160px;border-radius:8px;display:block;margin:6px 0 8px">` : "";
+  addMsg("viking", text.trim(), false, imgHtml);
+  const userMsg = {role:"viking", text:text.trim()};
+  if(attachedFile){ userMsg.image = attachedFile.dataUrl; }
+  messages.push(userMsg);
+  clearAttach();
   const apiMessages = [{role:"system", content:persona()}, ...toApi()];
   let directive=null;
   if(phase==="scripted" && queue.length){
@@ -657,7 +721,18 @@ async function delEntry(id){
 }
 
 /* ---------- 邀请码（管理员） ---------- */
-function fnHeaders(){ return {"Content-Type":"application/json","Authorization":"Bearer "+accessToken}; }
+async function fnHeaders(){
+  // 每次调用前从 supabase 客户端拿 fresh JWT（自动处理过期刷新）
+  let token = "";
+  try{
+    const { data } = await sb.auth.getSession();
+    token = data.session?.access_token || "";
+    accessToken = token;
+    uid = data.session?.user?.id || uid;
+    email = data.session?.user?.email || email;
+  }catch{}
+  return {"Content-Type":"application/json", "Authorization":"Bearer "+token};
+}
 async function loadInvites(){
   const box=$("#inviteList"); box.innerHTML='<div class="empty">加载中…</div>';
   try{
@@ -695,7 +770,7 @@ async function bootAfterAuth(){
   refreshModelPill();
   renderModelMenu();
   refreshMe();
-  startMode("evening");
+  startMode("morning");
 }
 function bindEvents(){
   // 每个绑定独立 try/catch，缺失元素能精确定位
@@ -704,10 +779,11 @@ function bindEvents(){
     if(!el){ console.warn("[bindEvents] missing id:", id); return; }
     el[ev] = fn;
   };
+  // 关键：fn(el, ev) — 第一个参数是元素，第二个是事件
   const bindAll = (sel, fn, ev="onclick") => {
     const els = document.querySelectorAll(sel);
     if(!els.length){ console.warn("[bindEvents] missing selector:", sel); return; }
-    els.forEach(el => el[ev] = fn);
+    els.forEach(el => { el[ev] = (e) => fn(el, e); });
   };
 
   bind("tabLogin", ()=>{ $("#tabLogin").classList.add("active"); $("#tabRegister").classList.remove("active");
@@ -715,8 +791,6 @@ function bindEvents(){
   bind("tabRegister", ()=>{ $("#tabRegister").classList.add("active"); $("#tabLogin").classList.remove("active");
     $("#loginForm").style.display="none"; $("#regForm").style.display="block"; });
   bind("liBtn", doLogin);
-  bind("liPass", e=>{ if(e.key==="Enter") doLogin(); }, "addEventListener_keydown_unused");
-  // keydown 通过 addEventListener 单独处理（保留兼容写法）
   const lp = document.getElementById("liPass"); if(lp) lp.addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
   bind("rgBtn", doRegister);
   const ri = document.getElementById("rgInvite"); if(ri) ri.addEventListener("keydown",e=>{ if(e.key==="Enter") doRegister(); });
@@ -724,7 +798,7 @@ function bindEvents(){
   bindAll(".mode", el=>startMode(el.dataset.mode));
   bind("sendBtn", ()=>{ const v=$("#input").value; if(v.trim()){ $("#input").value=""; sendUser(v);} });
   const inp = document.getElementById("input"); if(inp) inp.addEventListener("keydown",e=>{ if((e.metaKey||e.ctrlKey)&&e.key==="Enter"){ const v=$("#input").value; if(v.trim()){ $("#input").value=""; sendUser(v);} }});
-  bindAll(".chip", c=>quickAction(c.dataset.act));
+  bindAll(".chip", (el)=>quickAction(el.dataset.act));
   bind("genBtn", generate);
   bind("archiveBtn", ()=>{ $("#archiveMask").classList.add("show"); loadEntries(); });
   bind("closeArchive", ()=>$("#archiveMask").classList.remove("show"));
@@ -734,6 +808,16 @@ function bindEvents(){
   bind("helpBtn", ()=>$("#helpMask").classList.add("show"));
   bind("copyBtn", ()=>{ navigator.clipboard.writeText($("#previewText").textContent); $("#copyBtn").textContent="已复制✓"; setTimeout(()=>$("#copyBtn").textContent="复制全文",1500); });
   bind("previewExport", async()=>{ if(lastDay){ try{ await exportDay(lastDay); }catch(e){ alert(e.message); } } });
+  // 图片上传
+  bind("attachBtn", ()=>$("#fileInput").click());
+  bind("attachRemove", clearAttach);
+  const fi = document.getElementById("fileInput");
+  if(fi) fi.addEventListener("change", e=>{
+    const f = e.target.files && e.target.files[0];
+    if(!f) return;
+    handleAttach(f);
+    e.target.value = "";
+  });
   // 模型选择：点击/键盘打开菜单，外部点击关闭
   const openMenu=()=>{ renderModelMenu(); toggleModelMenu(); };
   const mp = document.getElementById("modelPill");
@@ -742,8 +826,8 @@ function bindEvents(){
     mp.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); openMenu(); } });
   }
   document.addEventListener("click", e=>{ if(!e.target.closest("#modelMenu") && !e.target.closest("#modelPill")) closeModelMenu(); });
-  bindAll("[data-close]", b=>$("#"+b.dataset.close).classList.remove("show"));
-  bindAll(".mask", m=>{ if(m.target===m) m.classList.remove("show"); });
+  bindAll("[data-close]", el=>$("#"+el.dataset.close).classList.remove("show"));
+  bindAll(".mask", (m,e)=>{ if(e.target===m) m.classList.remove("show"); });
 }
 async function boot(){
   const t = $("#bootTrace");
