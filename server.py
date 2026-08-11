@@ -302,7 +302,25 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif p == "/api/invites":
             self._api_invites()
         else:
+            m = re.match(r"^/([\w.\-]+\.(?:svg|css|js|png|ico))$", p)
+            if m:
+                f = (BASE / m.group(1)).resolve()
+                if str(f).startswith(str(BASE)) and f.exists():
+                    self._serve_file(f)
+                    return
             self._send({"error": "not found"}, 404)
+
+    def _serve_file(self, f: Path):
+        ctype = {".svg": "image/svg+xml", ".css": "text/css; charset=utf-8",
+                 ".js": "text/javascript; charset=utf-8", ".png": "image/png",
+                 ".ico": "image/x-icon"}.get(f.suffix.lower(), "application/octet-stream")
+        data = f.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(data)
 
     def do_DELETE(self):
         p = self.path.split("?")[0]
