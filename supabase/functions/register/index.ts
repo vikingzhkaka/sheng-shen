@@ -1,6 +1,6 @@
 // 省身 · Edge Function：注册（邮箱 + 密码 + 邀请码校验）
 // 部署：supabase functions deploy register
-// 环境变量（Supabase Edge Functions 自动注入）：SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+// 环境变量（Supabase Edge Functions 自动注入）：SUPABASE_URL, SERVICE_ROLE_KEY
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const cors = {
@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    Deno.env.get("SERVICE_ROLE_KEY")!,
     { auth: { persistSession: false } },
   );
 

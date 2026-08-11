@@ -1,6 +1,6 @@
 // 省身 · Edge Function：AI 教练对话代理（转发到 SenseNova 网关）
 // 部署：supabase functions deploy chat
-// 环境变量：SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY（自动注入）+ SENSENOVA_API_KEY（自己 set）
+// 环境变量：SUPABASE_URL, SERVICE_ROLE_KEY（自动注入）+ SENSENOVA_API_KEY（自己 set）
 // 安全：先校验调用者 JWT（未登录 401），key 只存在服务端环境变量
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
   if (!token) return json({ error: "未登录或会话已过期" }, 401);
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    Deno.env.get("SERVICE_ROLE_KEY")!,
     { auth: { persistSession: false } },
   );
   const { data: { user }, error: au } = await supabase.auth.getUser(token);

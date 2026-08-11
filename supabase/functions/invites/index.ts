@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
   if (!token) return json({ error: "未登录或会话已过期" }, 401);
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    Deno.env.get("SERVICE_ROLE_KEY")!,
     { auth: { persistSession: false } },
   );
   const { data: { user }, error: au } = await supabase.auth.getUser(token);
