@@ -502,13 +502,15 @@ async function apiCall(apiMessages){
   const headers = {"Content-Type":"application/json"};
   try{
     if(!sb) throw new Error("sb not ready");
-    let sess = null;
     const { data } = await sb.auth.getSession();
-    sess = data.session;
+    let sess = data.session;
     const now = Math.floor(Date.now()/1000);
-    if(!sess || (sess.expires_at && sess.expires_at < now + 60)){
-      const r = await sb.auth.refreshSession();
-      sess = r.data.session;
+    // 只在 expires_at 存在且临近过期才 refresh（避免无谓的慢）
+    if(sess && typeof sess.expires_at === "number" && sess.expires_at < now + 60){
+      try{
+        const r = await sb.auth.refreshSession();
+        sess = r.data?.session || sess;
+      }catch(re){ console.warn("[apiCall] refreshSession 失败:", re.message); }
     }
     if(sess?.access_token){ headers.Authorization = "Bearer "+sess.access_token; accessToken = sess.access_token; }
   }catch(e){ console.warn("[apiCall] 取 JWT 失败:", e.message); }
@@ -736,10 +738,10 @@ async function fnHeaders(){
     const g = await sb.auth.getSession();
     let sess = g.data?.session;
     if(!sess){ throw new Error("无 session，需要重新登录"); }
-    // 只有将要过期时才主动 refresh（避免每次请求都打 refresh 接口——这就是慢的根因）
+    // 只有 expires_at 存在且真的要过期时才 refresh；缺字段则不 refresh（避免每次都打 refresh 接口）
     const now = Math.floor(Date.now()/1000);
-    const exp = sess.expires_at || 0;
-    if(exp < now + 60){
+    const exp = sess.expires_at;
+    if(typeof exp === "number" && exp < now + 60){
       try{
         const r = await sb.auth.refreshSession();
         sess = r.data?.session || sess;
