@@ -734,11 +734,7 @@ async function fnHeaders(){
   try{
     if(!sb) throw new Error("sb 未初始化");
     const r = await sb.auth.refreshSession();
-    let sess = r.data?.session;
-    if(!sess){
-      const g = await sb.auth.getSession();
-      sess = g.data?.session;
-    }
+    let sess = r.data?.session || (await sb.auth.getSession()).data.session;
     token = sess?.access_token || "";
     accessToken = token;
     uid = sess?.user?.id || uid;
@@ -752,7 +748,6 @@ async function fnHeaders(){
 async function loadInvites(){
   const box=$("#inviteList"); box.innerHTML='<div class="empty">加载中…</div>';
   try{
-    // 用 supabase 官方 invoke，自动处理 JWT 刷新
     const { data, error } = await sb.functions.invoke("invites", { method:"GET" });
     if(error) throw error;
     const iv = data?.invites || [];
@@ -766,7 +761,17 @@ async function loadInvites(){
         <span style="color:var(--muted);font-size:12px">${esc((i.created_at||"").replace("T"," ").slice(0,16))}</span>`;
       box.appendChild(row);
     });
-  }catch(e){ box.innerHTML='<div class="empty">加载失败：'+esc(e.message||String(e))+'</div>'; }
+  }catch(e){
+    // 若 session 真的过期，强制重新登录
+    const msg = (e.message||String(e)).toLowerCase();
+    if(msg.includes("401") || msg.includes("未登录") || msg.includes("jwt") || msg.includes("auth")){
+      console.warn("[loadInvites] 会话失效，强制重新登录:", e.message);
+      box.innerHTML='<div class="empty" style="color:var(--muted)">会话已过期，请点"退出"重新登录。</div>';
+      // 不立刻 redirect — 让用户看到提示，自己点退出
+    } else {
+      box.innerHTML='<div class="empty">加载失败：'+esc(e.message||String(e))+'</div>';
+    }
+  }
 }
 async function genInvite(){
   try{
